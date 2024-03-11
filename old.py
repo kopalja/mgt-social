@@ -1,6 +1,12 @@
+
 from transformers import AutoTokenizer, FalconForCausalLM, AutoModelForSeq2SeqLM, pipeline, SummarizationPipeline
 import torch
 import os
+import time
+
+device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+# device = torch.device("cpu")
+
 
 
 article = """ 
@@ -26,42 +32,41 @@ Conclusion
 Hugging Face's story is one of transformation, collaboration, and empowerment. Their open-source contributions have reshaped the NLP landscape and democratized access to AI. As they continue to push the boundaries of AI research, we can expect Hugging Face to remain at the forefront of innovation, contributing to a more inclusive and ethical AI future. Their journey reminds us that the power of open-source collaboration can lead to groundbreaking advancements in technology and bring AI within the reach of many.
 """
 
+article = "Hello from the other side"
+
 model_name = "Falconsai/text_summarization"
 
 def v1(text):
     tokenizer = AutoTokenizer.from_pretrained(model_name)
     model = AutoModelForSeq2SeqLM.from_pretrained(model_name)
-    summarizer = pipeline("summarization", model=model, tokenizer=tokenizer)
-    return summarizer(text, max_length=1000, min_length=30, do_sample=False)[0]['summary_text']
-    
+    summarizer = pipeline("summarization", model=model, tokenizer=tokenizer, truncation=True)
+    return summarizer(text, max_length=4, min_length=0, do_sample=False)[0]['summary_text']
     
 def v2(text):
     tokenizer = AutoTokenizer.from_pretrained(model_name)
     model = AutoModelForSeq2SeqLM.from_pretrained(model_name)
     model.config.prefix = "summarize: "
-    summarizer = SummarizationPipeline(model=model, tokenizer=tokenizer)
-    return summarizer(text, max_length=1000, min_length=30, do_sample=False)[0]['summary_text']
+    summarizer = SummarizationPipeline(model=model, tokenizer=tokenizer, truncation=True)
+    return summarizer(text, max_length=512, min_length=30, do_sample=False)[0]['summary_text']
      
-
 def v3(text):
     tokenizer = AutoTokenizer.from_pretrained(model_name)
-    model = AutoModelForSeq2SeqLM.from_pretrained(model_name)
+    model = AutoModelForSeq2SeqLM.from_pretrained(model_name).to(device)
     encoded_input = tokenizer.encode("summarize: " + text, return_tensors='pt')
     with torch.no_grad():
-        output = model.generate(encoded_input, max_length=1000, min_length=30, do_sample=False)
-
+        output = model.generate(encoded_input.to(device), max_length=encoded_input.shape[1], min_length=0, do_sample=False)
     return tokenizer.batch_decode(output, skip_special_tokens=True)[0]
 
 
-
 if __name__ == '__main__':
-    r1 = v1(article)
-    r2 = v2(article)
-    r3 = v3(article)
-    print("========")
-    print(r1)
-    print("========")
-    print(r2)
-    print("========")
-    print(r3)
-
+    while True:
+        # r1 = v1(article)
+        # r2 = v2(article)
+        r3 = v3(article)
+        # print("1========")
+        # print(r1)
+        # print("2========")
+        # print(r2)
+        # print("3========")
+        print(r3)
+        
