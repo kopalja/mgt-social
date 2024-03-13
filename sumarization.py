@@ -8,7 +8,13 @@ import torch
 from tqdm import tqdm
 from transformers import AutoTokenizer, FalconForCausalLM, AutoModelForSeq2SeqLM, pipeline, SummarizationPipeline
 import torch
+import spacy
+import vertexai
+import time
+from vertexai.generative_models import GenerativeModel, Part
 
+# Load English tokenizer, tagger, parser and NER
+nlp = spacy.load("en_core_web_sm")
 
 
 def v1(text, model_name):
@@ -78,14 +84,25 @@ if __name__ == '__main__':
     df = df[df['language'].str.contains('en')]
 
     s = Sumarizator(version=3)
+    # model = init_model("mgt-social", "europe-west4")
     
     
     for c in df['text'].tolist():
         print("==============================")
         try:
-            print(c)
-            print("###")
-            print(s.process(c))
-        except:
+            doc = nlp(c)
+            print("### Or text: \n", c)
+            print("### Summary: \n", s.process(c))
+            print("### Subjects: \n", doc.ents)
+        except Exception as e:
+            print(e)
             continue
+        
+        
+        
+        
+        
+        
+        
+        
         

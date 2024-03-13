@@ -1,10 +1,8 @@
-# pip install -U spacy
-# python -m spacy download en_core_web_sm
 import spacy
 
 # Load English tokenizer, tagger, parser and NER
-# nlp = spacy.load("en_core_web_sm")
-nlp = spacy.load("sk_core_web_sm")
+nlp = spacy.load("en_core_web_sm")
+# nlp = spacy.load("sk_core_web_sm")
 
 # Process whole documents
 text = ("When Sebastian Thrun started working on self-driving cars at "
@@ -16,7 +14,7 @@ text = ("When Sebastian Thrun started working on self-driving cars at "
 
 # text = ("I need to go back to duolingo")
 text = ("hey levi u wanna play league of legends. I have an tool")
-text = "Ahoj, byvam v bratislave"
+# text = "Ahoj, byva v bratislave"
 doc = nlp(text)
 
 
