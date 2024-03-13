@@ -1,20 +1,9 @@
 import argparse
 import pandas as pd
 import numpy as np
-from transformers import AutoModelForCausalLM, AutoTokenizer, LlamaTokenizer, T5ForConditionalGeneration, BitsAndBytesConfig
 import torch
-# import nvidia_smi, psutil
-# from langcodes import *
-from tqdm import tqdm
 from transformers import AutoTokenizer, FalconForCausalLM, AutoModelForSeq2SeqLM, pipeline, SummarizationPipeline
-import torch
 import spacy
-import vertexai
-import time
-from vertexai.generative_models import GenerativeModel, Part
-
-# Load English tokenizer, tagger, parser and NER
-nlp = spacy.load("en_core_web_sm")
 
 
 def v1(text, model_name):
@@ -44,7 +33,7 @@ def v3(text, model_name):
     
 
 
-class Sumarizator:
+class Summarizer:
     def __init__(self, model_name: str = "Falconsai/text_summarization", version: int = 1) -> None:
 
         self.version = version
@@ -74,26 +63,24 @@ class Sumarizator:
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-    parser.add_argument("--model_name", default="llama", type=str)
+    parser.add_argument("--summarizer_model", default="Falconsai/text_summarization", type=str)
+    parser.add_argument("--spacy_model", default="en_core_web_sm", type=str)
+    parser.add_argument("--data", default="small_subset.csv", type=str)
     args = parser.parse_args()
     
+    spacy_model = spacy.load(args.spacy_model)
+    summarizer = Summarizer(args.summarizer_model, version=3)
     
-    df = pd.read_csv("small_subset.csv", encoding='utf-8')
-    
-    l = df['text'].apply(lambda x: len(x)).tolist()
+    df = pd.read_csv(args.data)
     df = df[df['language'].str.contains('en')]
-
-    s = Sumarizator(version=3)
-    # model = init_model("mgt-social", "europe-west4")
     
     
-    for c in df['text'].tolist():
+    for text in df['text'].tolist():
         print("==============================")
         try:
-            doc = nlp(c)
-            print("### Or text: \n", c)
-            print("### Summary: \n", s.process(c))
-            print("### Subjects: \n", doc.ents)
+            print("### Or text: \n", text)
+            print("### Summary: \n", summarizer.process(text))
+            print("### Subjects: \n", spacy_model(text).ents)
         except Exception as e:
             print(e)
             continue

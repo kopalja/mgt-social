@@ -16,8 +16,6 @@ def generate_text(project_id: str, location: str) -> str:
 
 
 
-
-
 def init_model(project_id: str, location: str) -> str:
     vertexai.init(project=project_id, location=location)
     return GenerativeModel("gemini-1.0-pro")
