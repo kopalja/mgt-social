@@ -43,7 +43,10 @@ if __name__ == '__main__':
     df = pd.read_csv(args.data)
     
     # l = df['text'].apply(lambda x: len(x)).tolist()
-    df = df[df['language'].str.contains('en')]
+    df = df[df['language'].str.contains('sk')]
+    df['text'] = df['text'].apply(decode_str)
+    print(df)
+    exit()
     df['text'] = df['text'].apply(decode_str)
 
     for c in df['text'].tolist():

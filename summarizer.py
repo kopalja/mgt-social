@@ -93,3 +93,10 @@ if __name__ == '__main__':
         
         
         
+
+###
+# Vicuna, instruction based
+# Opt66-iml, huggin face
+# ChatGpt
+# Gemini
+# Falcone, huggin face
