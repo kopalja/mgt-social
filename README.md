@@ -1,7 +1,7 @@
 
 1) Install packages
 ```
-pip install -r requirements.tx
+pip install -r requirements.txt
 mkdir data
 ```
 
