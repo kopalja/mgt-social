@@ -50,8 +50,7 @@ if __name__ == "__main__":
     parser.add_argument("--gemini_model_name", default="gemini-1.0-pro", type=str)
     parser.add_argument("--gemini_location", default="us-central1", type=str)
     parser.add_argument("--data", default="small_subset.csv", type=str)
-    # parser.add_argument("--languages", default=["en", "pt", "de", "nl", "es", "ru", "pl"], nargs="+")
-    parser.add_argument("--languages", default=["en"], nargs="+")
+    parser.add_argument("--languages", default=["en", "pt", "de", "nl", "es", "ru", "pl"], nargs="+")
     parser.add_argument("--type", type=GenerationType, choices=list(GenerationType), default=GenerationType.keywords)
     args = parser.parse_args()
 
