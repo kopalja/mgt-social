@@ -77,11 +77,4 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     model = Gemini(args.project_name, args.location, args.model_name)
-    df = pd.read_csv(args.data)
-    df = df[df["language"].str.contains("en")]
-
-    for c in df["text"].tolist():
-        print("==============================")
-        print(c)
-        print("###")
-        print(model.paraphrase(c))
+    print(model.query("What is the capital of Slovakia", sleep=0))
