@@ -41,7 +41,18 @@ class Summarizer:
         self.tokenizer = AutoTokenizer.from_pretrained(model_name)
         self.model = AutoModelForSeq2SeqLM.from_pretrained(model_name).to(self.device)
 
-    def process(self, text):
+    def process(self, text, language):
+        
+        language_name = {
+            "en": "english",
+            "pt": "portuguese",
+            "de": "german",
+            "nl": "dutch",
+            "es": "spanish",
+            "ru": "russian",
+            "pl": "polish",
+        }
+        
         if self.version == 1:
             summarizer = pipeline("summarization", model=self.model, tokenizer=self.tokenizer, truncation=True)
             return summarizer(text, max_length=512, min_length=30, do_sample=False)[0]['summary_text']
@@ -50,7 +61,10 @@ class Summarizer:
             summarizer = SummarizationPipeline(model=self.model, tokenizer=self.tokenizer, truncation=True)
             return summarizer(text, max_length=512, min_length=30, do_sample=False)[0]['summary_text']
         elif self.version == 3:
-            encoded_input = self.tokenizer.encode("summarize: " + text, return_tensors='pt', truncation=True)
+            prefix = f"summarize in language {language_name[language]}: "
+            print("#####################################")
+            print(prefix)
+            encoded_input = self.tokenizer.encode(prefix + text, return_tensors='pt', truncation=True)
             with torch.no_grad():
                 output = self.model.generate(encoded_input.to(self.device), max_length=encoded_input.shape[1], min_length=0, do_sample=False)
             return self.tokenizer.batch_decode(output, skip_special_tokens=True)[0]
@@ -95,8 +109,22 @@ if __name__ == '__main__':
         
 
 ###
-# Vicuna, instruction based
-# Opt66-iml, huggin face
-# ChatGpt
-# Gemini
-# Falcone, huggin face
+
+# 1 Sumarization
+    # Hugging Face
+    
+# 2 Keywords
+    # Vicuna, instruction based
+    # Opt66-iml, huggin face
+    # ChatGpt
+    # Gemini
+    # Falcone, huggin face
+    
+    
+      
+# 3 Paraphrase
+    # Vicuna, instruction based
+    # Opt66-iml, huggin face
+    # ChatGpt
+    # Gemini
+    # Falcone, huggin face
