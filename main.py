@@ -3,7 +3,6 @@ import os
 from enum import Enum
 
 import pandas as pd
-from tqdm import tqdm
 
 from gemini import Gemini
 from spacy_tagging import spacy_keywords
@@ -67,7 +66,7 @@ if __name__ == "__main__":
         pd.DataFrame(data=k_to_one()).to_csv("data/data_k_to_one.csv")
     else:
         data = dict([(n, []) for n in ["input", "output", "language", "source"]])
-        for row in tqdm(df.itertuples()):
+        for row in df.itertuples():
             data["source"].append(row.source)
             data["language"].append(row.language)
             data["input"].append(row.text)
