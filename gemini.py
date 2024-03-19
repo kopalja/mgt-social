@@ -94,10 +94,10 @@ class Gemini:
         for _ in range(iterations):
             for _ in range(repetitions_per_iteration):
 
-                # 1) Generate resopnse
+                # 1) Ask gemini
                 new_text = self.query(f'{JAILBREAK} {instruction} "{text}"')[len("JailBreak: "):]
 
-                # 2) If response starts with suspicious prefix discard response
+                # 2) If response starts with suspicious prefix discard it
                 if any([new_text.startswith(p) for p in STOP_PREFIX]):
                     continue
 
