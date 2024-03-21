@@ -100,13 +100,18 @@ class Gemini:
 
         return text
 
-    def similar_to_n(self, texts: List[str], language: str):
-        intro = f"Here are {len(texts)} short texts in language {self.language_code_to_name[language]} labeled from 1 to {len(texts)} each ended with ###."
-        # ending = "Create one new social media post similar to previous ones in structure and length"
-        # ending = "Create one new social media post that should be indistinguishable from the showed examples."
-        ending = "Create one new text that should be indistinguishable from the previous examples."
-        middle = "\n".join([f"{i+1}: {t} #" for i, t in enumerate(texts)])
-        prompt = f"{intro}:\n{middle}\n{ending}"
+    def similar_to_n(self, texts: List[str], language: str, k: int):
+        intro = f"You are a helpful assistant. Generate a short text similar to the following examples. The text must be in {self.language_code_to_name[language]} language.\n"
+        examples = ""
+        for idx, text in enumerate(texts[:k+1]):
+            examples += f"EXAMPLE {idx+1}: {text}\n"
+        examples += f"GENERATED TEXT: {texts[k+1]}\n\n"
+        
+        current = ""
+        for i, text in enumerate(texts[k+2:]):
+            current += f"EXAMPLE {i+1}: {text}\n"
+        current += "GENERATED TEXT:"
+        prompt = f"{intro}\n{examples}\n{current}"
         return self.query(prompt)
 
 
