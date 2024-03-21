@@ -27,20 +27,24 @@ def spacy(gemini, text: str, language: str):
     return result
 
 
-def k_to_one(k: int = 6) -> dict:
-    data = dict([(n, []) for n in ["output", "language", "source"]])
+
+
+def k_to_one(gemini, data: pd.DataFrame, k: int = 6) -> dict:
+    results = {col:[] for col in ["input", "output", "source", "language"]}
     groups = df.groupby(["language", "source"])
     for (language, source), group in groups:
-        for _ in range(3):
-            texts = list(group.sample(n=k)["text"])
-            gemini_response = gemini.similar_to_n(texts, language)
-            if gemini_response.startswith(f"{k+1}: "):
-                gemini_response = gemini_response[3:]
-            data["source"].append(source)
-            data["language"].append(language)
-            data["output"].append(gemini_response)
-    return data
-
+            for _ in range(len(group)):
+                # We need 2k+1 number of samples - k+1 for the in-context example and k for the generation 
+                if len(group) < 2*k+1:
+                    print(f"Not enough samples for language {language} and source {source}. At least {2*k+1} are needed but there are only {len(group)}. Skipping...")
+                    break
+                texts = list(group.sample(n=2*k+1)["text"])
+                gemini_response = gemini.similar_to_n(texts, language, k)
+                results["input"].append("\n".join(texts))
+                results["source"].append(source)
+                results["language"].append(language)
+                results["output"].append(gemini_response)
+    return results
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
@@ -63,7 +67,7 @@ if __name__ == "__main__":
     df = df[["text", "language", "source"]]
 
     if args.type == GenerationType.k_to_one:
-        pd.DataFrame(data=k_to_one()).to_csv("data/data_k_to_one.csv")
+        pd.DataFrame(k_to_one(gemini, df, k=3)).to_csv("data/data_k_to_one.csv")
     else:
         data = dict([(n, []) for n in ["input", "output", "language", "source"]])
         for row in df.itertuples():
