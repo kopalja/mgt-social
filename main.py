@@ -4,6 +4,8 @@ from enum import Enum
 
 import pandas as pd
 
+from vicuna import Vicuna
+from mistral import Mistral
 from gemini import Gemini
 from spacy_tagging import spacy_keywords
 from summarizer import Summarizer
@@ -29,7 +31,7 @@ def spacy(gemini, text: str, language: str):
 
 
 
-def k_to_one(gemini, data: pd.DataFrame, k: int = 6) -> dict:
+def k_to_one(model, data: pd.DataFrame, k: int = 6) -> dict:
     results = {col:[] for col in ["input", "output", "source", "language"]}
     groups = df.groupby(["language", "source"])
     for (language, source), group in groups:
@@ -39,7 +41,7 @@ def k_to_one(gemini, data: pd.DataFrame, k: int = 6) -> dict:
                     print(f"Not enough samples for language {language} and source {source}. At least {2*k+1} are needed but there are only {len(group)}. Skipping...")
                     break
                 texts = list(group.sample(n=2*k+1)["text"])
-                gemini_response = gemini.similar_to_n(texts, language, k)
+                gemini_response = model.similar_to_n(texts, language, k)
                 results["input"].append("\n".join(texts))
                 results["source"].append(source)
                 results["language"].append(language)
@@ -48,18 +50,28 @@ def k_to_one(gemini, data: pd.DataFrame, k: int = 6) -> dict:
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
+    parser.add_argument("--data", default="small_subset.csv", type=str)
     parser.add_argument("--summarizer_model", default="Falconsai/text_summarization", type=str)
     parser.add_argument("--gemini_project_name", default="mgt-social", type=str)
     parser.add_argument("--gemini_model_name", default="gemini-1.0-pro", type=str)
     parser.add_argument("--gemini_location", default="us-central1", type=str)
-    parser.add_argument("--data", default="small_subset.csv", type=str)
+    parser.add_argument("--vicuna_path", default="/mnt/dominik.macko/vicuna-13b", type=str)
+    parser.add_argument("--mistral_path", default="/mnt/jakub.kopal/models--mistralai--Mistral-7B-Instruct-v0.1/snapshots/73068f3702d050a2fd5aa2ca1e612e5036429398", type=str)
     parser.add_argument("--languages", default=["en", "pt", "de", "nl", "es", "ru", "pl"], nargs="+")
-    parser.add_argument("--type", type=GenerationType, choices=list(GenerationType), default=GenerationType.paraphrase)
+    parser.add_argument("--type", type=GenerationType, choices=list(GenerationType), default=GenerationType.k_to_one)
+    parser.add_argument("--model_name", type=str, required=True)
     args = parser.parse_args()
 
     # 1) Create models
-    gemini = Gemini(args.gemini_project_name, args.gemini_location, args.gemini_model_name, debug=True)
     summarizer = Summarizer(args.summarizer_model, version=3)
+    if args.model_name == "gemini":
+        model = Gemini(args.gemini_project_name, args.gemini_location, args.gemini_model_name, debug=True)
+    elif args.model_name == "vicuna":
+        model = Vicuna(args.vicuna_path , debug=True)
+    elif args.model_name == "mistral":
+        model = Mistral(args.mistral_path , debug=True)
+    else:
+        raise Exception(f"Unsupported model type: {args.model_name}. Supported model names are: `gemini`, `vicuna`.")
 
     # 2) Preprocess data
     df = pd.read_csv(args.data)
@@ -67,7 +79,7 @@ if __name__ == "__main__":
     df = df[["text", "language", "source"]]
 
     if args.type == GenerationType.k_to_one:
-        pd.DataFrame(k_to_one(gemini, df, k=3)).to_csv("data/data_k_to_one.csv")
+        pd.DataFrame(k_to_one(model, df, k=3)).to_csv("data/data_k_to_one.csv")
     else:
         data = dict([(n, []) for n in ["input", "output", "language", "source"]])
         for row in df.itertuples():
@@ -76,12 +88,11 @@ if __name__ == "__main__":
             data["input"].append(row.text)
 
             if args.type == GenerationType.paraphrase:
-                data["output"].append(gemini.paraphrase(row.text, row.language))
+                data["output"].append(model.paraphrase(row.text, row.language))
             elif args.type == GenerationType.keywords:
-                data["output"].append(spacy(gemini, row.text, row.language))
+                data["output"].append(spacy(model, row.text, row.language))
             elif args.type == GenerationType.summarizer:
                 summ = summarizer.process(row.text, row.language)
-                data["output"].append(gemini.paraphrase(summ, row.language, iterations=1))
-                print(row.text)
-                print(summ)
+                data["output"].append(model.paraphrase(summ, row.language, iterations=1))
+                
         pd.DataFrame(data=data).to_csv(os.path.join("data", f"data_{args.type}.csv"))

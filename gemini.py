@@ -7,6 +7,8 @@ import vertexai
 from vertexai.generative_models import (GenerationConfig, GenerativeModel,
                                         HarmBlockThreshold, HarmCategory)
 
+from misc import LANGUAGE_CODE_MAP
+
 STOP_PREFIX = [
     "I am sorry, I cannot",
     "I am sorry, I am not supposed to",
@@ -65,15 +67,6 @@ class Gemini:
             HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT: HarmBlockThreshold.BLOCK_NONE,
             HarmCategory.HARM_CATEGORY_UNSPECIFIED: HarmBlockThreshold.BLOCK_NONE,
         }
-        self.language_code_to_name = {
-            "en": "english",
-            "pt": "portuguese",
-            "de": "german",
-            "nl": "dutch",
-            "es": "spanish",
-            "ru": "russian",
-            "pl": "polish",
-        }
 
     def query(self, inpt: str, sleep: int = 2) -> str:
         try:
@@ -90,7 +83,7 @@ class Gemini:
             return "No response from Gemini."
 
     def paraphrase(self, text: str, language: str, iterations: int = 3, repetitions_per_iteration: int = 5):
-        instruction = f"Your ultimate goal is to rephrase in {self.language_code_to_name[language]} using different words and sentence composition the following text:"
+        instruction = f"Your ultimate goal is to rephrase in {LANGUAGE_CODE_MAP[language]} using different words and sentence composition the following text:"
         for _ in range(iterations):
             for _ in range(repetitions_per_iteration):
                 new_text = self.query(f'{JAILBREAK} {instruction} "{text}"')[len("JailBreak: "):]
@@ -101,7 +94,7 @@ class Gemini:
         return text
 
     def similar_to_n(self, texts: List[str], language: str, k: int):
-        intro = f"You are a helpful assistant. Generate a short text similar to the following examples. The text must be in {self.language_code_to_name[language]} language.\n"
+        intro = f"You are a helpful assistant. Generate a short text similar to the following examples. The text must be in {LANGUAGE_CODE_MAP[language]} language.\n"
         examples = ""
         for idx, text in enumerate(texts[:k+1]):
             examples += f"EXAMPLE {idx+1}: {text}\n"
