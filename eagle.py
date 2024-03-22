@@ -31,22 +31,14 @@ class Eagle:
 
 
     def paraphrase(self, text: str, language: str, iterations: int = 3):
-        inpt = text
         instruction = f"Your goal is to paraphrase text in {LANGUAGE_CODE_MAP[language]} using different words and sentence composition. Responde with only paraphrased text and nothing else. Text to paraphrase:"
         for _ in range(iterations):
-            prompt = [{"role": "user", "content": f"{instruction} {text}"}]
-            response = self.query(prompt)
-            if response != "":
-                text = response
-             
-        if self.debug:
-            print(f"############## Paraphrase Prompt ##############\n{inpt}")
-            print(f"############## Paraphrase Response ##############\n{response}")
-        return response
+            prompt = f'{instruction} "{text}"'
+            output = self.query(prompt)
+        return output
         
         
     def similar_to_n(self, texts: List[str], language: str, k: int):
-        # TODO: This instruction was fine-tuned on Gemini and is too complex for Vecuna
         intro = f"You are a helpful assistant. Generate a short text similar to the following examples. The text must be in {LANGUAGE_CODE_MAP[language]} language.\n"
         examples = ""
         for idx, text in enumerate(texts[:k+1]):
