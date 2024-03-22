@@ -14,18 +14,19 @@ class Eagle:
     def __init__(self, model_name: str,  debug: bool = False, cache_dir: Optional[str] = None) -> None:
         self.debug = debug
         self.device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
-        self.tokenizer = AutoTokenizer.from_pretrained(model_name)
-        self.model = AutoModelForCausalLM.from_pretrained(model_name, load_in_4bit=True)
+        self.tokenizer = AutoTokenizer.from_pretrained(model_name, trust_remote_code=True)
+        self.model = AutoModelForCausalLM.from_pretrained(model_name, trust_remote_code=True, torch_dtype=torch.float16).to(self.device)
         
-    def query(self, inpt: str) -> str:
-        encoded_input = self.tokenizer.encode(inpt, return_tensors="pt", truncation=True)
+    def query(self, instruction: str) -> str:
+        input = generate_prompt(instruction)
+        encoded_input = self.tokenizer.encode(input, return_tensors="pt", truncation=True)
         with torch.no_grad():
             output = self.model.generate(
-                encoded_input.to(self.device), max_new_tokens=1000000, min_length=0, do_sample=False, pad_token_id=self.tokenizer.eos_token_id
+                encoded_input.to(self.device), max_new_tokens=300, min_length=0, do_sample=False, pad_token_id=self.tokenizer.eos_token_id
             )
         response = self.tokenizer.batch_decode(output, skip_special_tokens=True)[0]
         if self.debug:
-            print(f"############## Prompt ##############\n{inpt}")
+            print(f"############## Prompt ##############\n{input}")
             print(f"############## Response ##############\n{response}")
         return response
 
@@ -51,8 +52,26 @@ class Eagle:
         current += "GENERATED TEXT:"
         prompt = f"{intro}\n{examples}\n{current}"
         return self.query(prompt)
-        
-        
+
+
+def generate_prompt(instruction, input=""):
+    instruction = instruction.strip().replace('\r\n','\n').replace('\n\n','\n')
+    input = input.strip().replace('\r\n','\n').replace('\n\n','\n')
+    if input:
+        return f"""Instruction: {instruction}
+
+Input: {input}
+
+Response:"""
+    else:
+        return f"""User: hi
+
+Assistant: Hi. I am your assistant and I will provide expert full response in full details. Please feel free to ask any question and I will always answer it.
+
+User: {instruction}
+
+Assistant:"""
+
 
 
 if __name__ == "__main__":
