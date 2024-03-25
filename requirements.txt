@@ -1,4 +1,6 @@
+accelerate==0.28.0
 annotated-types==0.6.0
+bitsandbytes==0.42.0
 black==24.3.0
 blis==0.7.11
 cachetools==5.3.3
@@ -12,13 +14,13 @@ curated-tokenizers==0.0.9
 curated-transformers==0.1.1
 cymem==2.0.8
 DAWG-Python==0.7.2
-de-core-news-sm @ https://github.com/explosion/spacy-models/releases/download/de_core_news_sm-3.7.0/de_core_news_sm-3.7.0-py3-none-any.whl
-de-dep-news-trf @ https://github.com/explosion/spacy-models/releases/download/de_dep_news_trf-3.7.2/de_dep_news_trf-3.7.2-py3-none-any.whl
+de-core-news-sm @ https://github.com/explosion/spacy-models/releases/download/de_core_news_sm-3.7.0/de_core_news_sm-3.7.0-py3-none-any.whl#sha256=d88c737eb7eb766f730f6a2dcb99dfcdb81623e1e0d89a9c638a2182ac19c52e
+de-dep-news-trf @ https://github.com/explosion/spacy-models/releases/download/de_dep_news_trf-3.7.2/de_dep_news_trf-3.7.2-py3-none-any.whl#sha256=3fb898b58c3647aa157e8b3ceb7acb43499f27e6d2f8a23f4c130f9c3de32cd4
 docopt==0.6.2
 docutils==0.20.1
-en-core-web-sm @ https://github.com/explosion/spacy-models/releases/download/en_core_web_sm-3.7.1/en_core_web_sm-3.7.1-py3-none-any.whl
-en-core-web-trf @ https://github.com/explosion/spacy-models/releases/download/en_core_web_trf-3.7.3/en_core_web_trf-3.7.3-py3-none-any.whl
-es-core-news-sm @ https://github.com/explosion/spacy-models/releases/download/es_core_news_sm-3.7.0/es_core_news_sm-3.7.0-py3-none-any.whl
+en-core-web-sm @ https://github.com/explosion/spacy-models/releases/download/en_core_web_sm-3.7.1/en_core_web_sm-3.7.1-py3-none-any.whl#sha256=86cc141f63942d4b2c5fcee06630fd6f904788d2f0ab005cce45aadb8fb73889
+en-core-web-trf @ https://github.com/explosion/spacy-models/releases/download/en_core_web_trf-3.7.3/en_core_web_trf-3.7.3-py3-none-any.whl#sha256=f72abb34bdf174876bd4267b29b2501677e605e0a251fdc56c163003182ed68b
+es-core-news-sm @ https://github.com/explosion/spacy-models/releases/download/es_core_news_sm-3.7.0/es_core_news_sm-3.7.0-py3-none-any.whl#sha256=61e6e5530941f5880166855f09f60d7e6ba79ec1e8e45f96244bdb1eb169eb1d
 filelock==3.13.1
 fsspec==2024.2.0
 fundamentals==2.6.2
@@ -50,7 +52,7 @@ mpmath==1.3.0
 murmurhash==1.0.10
 mypy-extensions==1.0.0
 networkx==3.2.1
-nl-core-news-sm @ https://github.com/explosion/spacy-models/releases/download/nl_core_news_sm-3.7.0/nl_core_news_sm-3.7.0-py3-none-any.whl
+nl-core-news-sm @ https://github.com/explosion/spacy-models/releases/download/nl_core_news_sm-3.7.0/nl_core_news_sm-3.7.0-py3-none-any.whl#sha256=9255c3ce9e639f0a7aa8e898f4514e6ad803284858241385e045f99637753770
 numpy==1.26.4
 nvidia-cublas-cu12==12.1.3.1
 nvidia-cuda-cupti-cu12==12.1.105
@@ -69,7 +71,7 @@ packaging==24.0
 pandas==2.2.1
 pathspec==0.12.1
 pillow==10.2.0
-pl-core-news-sm @ https://github.com/explosion/spacy-models/releases/download/pl_core_news_sm-3.7.0/pl_core_news_sm-3.7.0-py3-none-any.whl
+pl-core-news-sm @ https://github.com/explosion/spacy-models/releases/download/pl_core_news_sm-3.7.0/pl_core_news_sm-3.7.0-py3-none-any.whl#sha256=94fd294e49f87fccf863f2792a1d89be1a0fd0a3c549790b2c8338ac304bee36
 platformdirs==4.2.0
 pluggy==1.4.0
 polyglot==16.7.4
@@ -78,13 +80,12 @@ preshed==3.0.9
 proto-plus==1.23.0
 protobuf==4.25.3
 psutil==5.9.8
-pt-core-news-sm @ https://github.com/explosion/spacy-models/releases/download/pt_core_news_sm-3.7.0/pt_core_news_sm-3.7.0-py3-none-any.whl
+pt-core-news-sm @ https://github.com/explosion/spacy-models/releases/download/pt_core_news_sm-3.7.0/pt_core_news_sm-3.7.0-py3-none-any.whl#sha256=a3a8eed42c600af17c70ed3c8720ffe2879b5353055e66fe0c998306329052fd
 pyasn1==0.5.1
 pyasn1-modules==0.3.0
 pycld2==0.41
 pydantic==2.6.3
 pydantic_core==2.16.3
-PyICU==2.12
 pymorphy3==2.0.1
 pymorphy3-dicts-ru==2.4.417150.4580142
 pytest==8.1.1
@@ -97,8 +98,10 @@ regex==2023.12.25
 requests==2.31.0
 requests-oauthlib==1.4.0
 rsa==4.9
-ru-core-news-sm @ https://github.com/explosion/spacy-models/releases/download/ru_core_news_sm-3.7.0/ru_core_news_sm-3.7.0-py3-none-any.whl
+ru-core-news-sm @ https://github.com/explosion/spacy-models/releases/download/ru_core_news_sm-3.7.0/ru_core_news_sm-3.7.0-py3-none-any.whl#sha256=4b1c291c9b8991b708dadbf1b59f0fdaf7e70ca25e94df7fd3d523c4d5049754
 safetensors==0.4.2
+scipy==1.12.0
+sentencepiece==0.2.0
 shapely==2.0.3
 six==1.16.0
 smart-open==6.4.0
