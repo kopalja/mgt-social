@@ -18,16 +18,20 @@ class Mistral:
         self.model = AutoModelForCausalLM.from_pretrained(model_name, load_in_4bit=True)
         
     def query(self, inpt: str) -> str:
-        encoded_input = self.tokenizer.apply_chat_template(inpt, return_tensors="pt")
-        with torch.no_grad():
-            output = self.model.generate(
-                encoded_input.to(self.device), max_new_tokens=1000000, min_length=0, do_sample=False, pad_token_id=self.tokenizer.eos_token_id
-            )
-        response = self.tokenizer.batch_decode(output, skip_special_tokens=True)[0]
-        if self.debug:
-            print(f"############## Prompt ##############\n{inpt}")
-            print(f"############## Response ##############\n{response}")
-        return response.split("[/INST]")[-1]
+        try:
+            encoded_input = self.tokenizer.apply_chat_template(inpt, return_tensors="pt")
+            with torch.no_grad():
+                output = self.model.generate(
+                    encoded_input.to(self.device), max_new_tokens=1000000, min_length=0, do_sample=False, pad_token_id=self.tokenizer.eos_token_id
+                )
+            response = self.tokenizer.batch_decode(output, skip_special_tokens=True)[0]
+            if self.debug:
+                print(f"############## Prompt ##############\n{inpt}")
+                print(f"############## Response ##############\n{response}")
+            return response.split("[/INST]")[-1]
+        except Exception as e:
+            print(f"Exception during inference: {e}")
+            return "Exception during inference"
 
 
     def paraphrase(self, text: str, language: str, iterations: int = 3):

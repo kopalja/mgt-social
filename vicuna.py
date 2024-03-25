@@ -18,17 +18,21 @@ class Vicuna:
         self.model = LlamaForCausalLM.from_pretrained(model_name, load_in_4bit=True, cache_dir=cache_dir)
         
     def query(self, inpt: str) -> str:
-        encoded_input = self.tokenizer.encode(inpt, return_tensors="pt", truncation=True)
-        with torch.no_grad():
-            output = self.model.generate(
-                encoded_input.to(self.device), max_new_tokens=1000000, min_length=0, do_sample=False
-            )
-        response = self.tokenizer.batch_decode(output, skip_special_tokens=True)[0]
-            
-        if self.debug:
-            print(f"############## Prompt ##############\n{inpt}")
-            print(f"############## Response ##############\n{response}")
-        return response
+        try:
+            encoded_input = self.tokenizer.encode(inpt, return_tensors="pt", truncation=True)
+            with torch.no_grad():
+                output = self.model.generate(
+                    encoded_input.to(self.device), max_new_tokens=1000, min_length=0, do_sample=False
+                )
+            response = self.tokenizer.batch_decode(output, skip_special_tokens=True)[0]
+                
+            if self.debug:
+                print(f"############## Prompt ##############\n{inpt}")
+                print(f"############## Response ##############\n{response}")
+            return response
+        except Exception as e:
+            print(f"Exception during inference: {e}")
+            return "Exception during inference"
 
     def __post_process_output(self, prompt: str, text: str) -> str:
         text = text[len(prompt):].strip()
@@ -65,17 +69,6 @@ class Vicuna:
         return self.query(prompt)
         
         
-    # # TODO
-    # def k_to_one(self, texts: List[str], language: str):
-    #     intro = f"Here are {len(texts)} short texts in language {LANGUAGE_CODE_MAP[language]} labeled from 1 to {len(texts)} each ended with ###."
-    #     # ending = "Create one new social media post similar to previous ones in structure and length"
-    #     # ending = "Create one new social media post that should be indistinguishable from the showed examples."
-    #     ending = "Create one new text that should be indistinguishable from the previous examples."
-    #     middle = "\n".join([f"{i+1}: {t} #" for i, t in enumerate(texts)])
-    #     prompt = f"{intro}:\n{middle}\n{ending}"
-    #     return self.query(prompt)
-        
-
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
