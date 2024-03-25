@@ -47,10 +47,11 @@ class Mistral:
         
     def similar_to_n(self, texts: List[str], language: str, k: int):
         # TODO: Doesn't perform well. Aparently too complex prompt.
+        intro = f"You are a helpful assistant. Generate a short text similar to the following examples. The text must be in {LANGUAGE_CODE_MAP[language]} language.\n"
         messages = []
-        messages.append({"role": "user", "content": ' '.join([ f"EXAMPLE {idx+1}: {text}" for idx, text in enumerate(texts[:k+1])])})
+        messages.append({"role": "user", "content": intro + ' '.join([ f"EXAMPLE {idx+1}: {text}" for idx, text in enumerate(texts[:k+1])])})
         messages.append({"role": "assistant", "content": f"GENERATED TEXT: {texts[k+1]}"})
-        messages.append({"role": "user", "content": ' '.join([ f"EXAMPLE {idx+1}: {text}" for idx, text in enumerate(texts[k+2:])])})
+        messages.append({"role": "user", "content": intro + ' '.join([ f"EXAMPLE {idx+1}: {text}" for idx, text in enumerate(texts[k+2:])])})
         return self.query(messages)
         
         

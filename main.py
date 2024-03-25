@@ -32,21 +32,20 @@ def spacy(gemini, text: str, language: str):
 
 
 
-def k_to_one(model, data: pd.DataFrame, k: int = 6) -> dict:
+def k_to_one(model, data: pd.DataFrame, k: int = 6, examples_per_group: int  = 3) -> dict:
     results = {col:[] for col in ["input", "output", "source", "language"]}
-    groups = df.groupby(["language", "source"])
+    groups = data.groupby(["language", "source"])
     for (language, source), group in groups:
-            for _ in range(len(group)):
-                # We need 2k+1 number of samples - k+1 for the in-context example and k for the generation 
-                if len(group) < 2*k+1:
-                    print(f"Not enough samples for language {language} and source {source}. At least {2*k+1} are needed but there are only {len(group)}. Skipping...")
-                    break
-                texts = list(group.sample(n=2*k+1)["text"])
-                gemini_response = model.similar_to_n(texts, language, k)
-                results["input"].append("\n".join(texts))
-                results["source"].append(source)
-                results["language"].append(language)
-                results["output"].append(gemini_response)
+        for _ in range(examples_per_group):
+            # We need 2k+1 number of samples - k+1 for the in-context example and k for the generation 
+            if len(group) < 2*k+1:
+                print(f"Not enough samples for language {language} and source {source}. At least {2*k+1} are needed but there are only {len(group)}. Skipping...")
+                break
+            texts = list(group.sample(n=2*k+1)["text"])
+            results["input"].append("\n".join(texts))
+            results["source"].append(source)
+            results["language"].append(language)
+            results["output"].append(model.similar_to_n(texts, language, k))
     return results
 
 if __name__ == "__main__":
@@ -83,7 +82,7 @@ if __name__ == "__main__":
     df = df[["text", "language", "source"]]
 
     if args.type == GenerationType.k_to_one:
-        pd.DataFrame(k_to_one(model, df, k=3)).to_csv("data/data_k_to_one.csv")
+        pd.DataFrame(k_to_one(model, df, k=3)).to_csv(os.path.join("data", args.model_name, "data_k_to_one.csv"))
     else:
         data = dict([(n, []) for n in ["input", "output", "language", "source"]])
         for row in df.itertuples():
@@ -99,4 +98,4 @@ if __name__ == "__main__":
                 summ = summarizer.process(row.text, row.language)
                 data["output"].append(model.paraphrase(summ, row.language, iterations=1))
                 
-        pd.DataFrame(data=data).to_csv(os.path.join("data", f"data_{args.type}.csv"))
+        pd.DataFrame(data=data).to_csv(os.path.join("data", args.model_name, f"data_{args.type}.csv"))
