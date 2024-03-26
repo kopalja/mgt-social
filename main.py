@@ -8,6 +8,7 @@ from vicuna import Vicuna
 from mistral import Mistral
 from gemini import Gemini
 from eagle import Eagle
+from opt import Opt
 from spacy_tagging import spacy_keywords
 from summarizer import Summarizer
 
@@ -73,6 +74,8 @@ if __name__ == "__main__":
         model = Mistral(args.mistral_path , debug=True)
     elif args.model_name == "eagle":
         model = Eagle(args.eagle_path, debug=True)
+    elif args.model_name == "opt":
+        model = Opt(args.eagle_path, debug=True)
     else:
         raise Exception(f"Unsupported model type: {args.model_name}. Supported model names are: `gemini`, `vicuna`, `mistral`, `eagle`.")
 

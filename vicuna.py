@@ -11,9 +11,9 @@ from misc import LANGUAGE_CODE_MAP
 
 
 class Vicuna:
-    def __init__(self, model_name: str,  debug: bool = False, cache_dir: Optional[str] = None) -> None:
+    def __init__(self, model_name: str,  debug: bool = False, use_gpu: bool = False, cache_dir: Optional[str] = None) -> None:
         self.debug = debug
-        self.device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+        self.device = torch.device("cuda:0" if torch.cuda.is_available() and use_gpu else "cpu")
         self.tokenizer = LlamaTokenizer.from_pretrained(model_name, cache_dir=cache_dir)
         self.model = LlamaForCausalLM.from_pretrained(model_name, load_in_4bit=True, cache_dir=cache_dir)
         
@@ -74,9 +74,15 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--data", default="small_subset.csv", type=str)
     parser.add_argument("--languages", default=["en", "cz", "sk"], nargs="+")
+    parser.add_argument("--model_path", default=None, type=str)
+    parser.add_argument("--use_gpu", default=False, action=argparse.BooleanOptionalAction)
     args = parser.parse_args()
     
-    vicuna = Vicuna("/data/kopalja/vicuna-13b", debug=True, cache_dir="/mnt/jakub.kopal")
+    if args.model_path:
+        vicuna = Vicuna(args.model_path, use_gpu=args.use_gpu, debug=True)
+    else:
+        vicuna = Vicuna("lmsys/vicuna-13b-v1.5-16k", use_gpu=args.use_gpu, debug=True)
+        
     df = pd.read_csv(args.data)
     df = df[df["language"].isin(args.languages)]
     df = df[["text", "language", "source"]]

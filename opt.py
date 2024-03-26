@@ -11,14 +11,13 @@ from misc import LANGUAGE_CODE_MAP
 
 
 class Opt:
-    def __init__(self, model_name: str,  debug: bool = False, user_gpu: bool = False, cache_dir: Optional[str] = None) -> None:
+    def __init__(self, model_name: str,  debug: bool = False, use_gpu: bool = False, cache_dir: Optional[str] = None) -> None:
         self.debug = debug
-        self.device = torch.device("cuda:0" if torch.cuda.is_available() and user_gpu else "cpu")
+        self.device = torch.device("cuda:0" if torch.cuda.is_available() and use_gpu else "cpu")
         self.tokenizer = AutoTokenizer.from_pretrained(model_name, cache_dir=cache_dir, use_fast=False)
         self.model = AutoModelForCausalLM.from_pretrained(model_name, cache_dir=cache_dir).to(self.device)
         
     def query(self, inpt: str) -> str:
-        # TODO: Same output as input
         try:
             encoded_input = self.tokenizer.encode(inpt, return_tensors="pt").to(self.device)
             with torch.no_grad():
@@ -65,14 +64,23 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--data", default="small_subset.csv", type=str)
     parser.add_argument("--languages", default=["en", "cz", "sk"], nargs="+")
+    parser.add_argument("--model_path", default=None, type=str)
+    parser.add_argument("--use_gpu", default=False, action=argparse.BooleanOptionalAction)
     args = parser.parse_args()
     
-    opt = Opt("facebook/opt-iml-max-30b", debug=True)
+    if args.model_path:
+        opt = Opt(args.model_path, use_gpu=args.use_gpu, debug=True)
+    else:
+        opt = Opt("facebook/opt-iml-max-30b", use_gpu=args.use_gpu, debug=True)
 
     df = pd.read_csv(args.data)
     df = df[df["language"].isin(args.languages)]
     df = df[["text", "language", "source"]]
+    index = 0
     for row in df.itertuples():
+        index += 1
+        if index < 10:
+            continue
         opt.paraphrase(row.text, row.language)
         break
 

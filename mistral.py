@@ -11,11 +11,11 @@ from misc import LANGUAGE_CODE_MAP
 
 
 class Mistral:
-    def __init__(self, model_name: str,  debug: bool = False, cache_dir: Optional[str] = None) -> None:
+    def __init__(self, model_name: str,  debug: bool = False, use_gpu: bool = False, cache_dir: Optional[str] = None) -> None:
         self.debug = debug
-        self.device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
-        self.tokenizer = AutoTokenizer.from_pretrained(model_name)
-        self.model = AutoModelForCausalLM.from_pretrained(model_name, load_in_4bit=True)
+        self.device = torch.device("cuda:0" if torch.cuda.is_available() and use_gpu else "cpu")
+        self.tokenizer = AutoTokenizer.from_pretrained(model_name, cache_dir=cache_dir)
+        self.model = AutoModelForCausalLM.from_pretrained(model_name, load_in_4bit=True, cache_dir=cache_dir)
         
     def query(self, inpt: str) -> str:
         try:
@@ -64,11 +64,16 @@ class Mistral:
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--data", default="small_subset.csv", type=str)
-    parser.add_argument("--model_name", type=str, required=True)
     parser.add_argument("--languages", default=["en", "cz", "sk"], nargs="+")
+    parser.add_argument("--model_path", default=None, type=str)
+    parser.add_argument("--use_gpu", default=False, action=argparse.BooleanOptionalAction)
     args = parser.parse_args()
     
-    mistral = Mistral(args.model_name, debug=False)
+    if args.model_path:
+        mistral = Mistral(args.model_path, use_gpu=args.use_gpu, debug=True)
+    else:
+        mistral = Mistral("mistralai/Mistral-7B-Instruct-v0.1", use_gpu=args.use_gpu, debug=True)
+        
     df = pd.read_csv(args.data)
     df = df[df["language"].isin(args.languages)]
     df = df[["text", "language", "source"]]

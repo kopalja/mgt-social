@@ -11,9 +11,9 @@ from misc import LANGUAGE_CODE_MAP
 
 
 class Eagle:
-    def __init__(self, model_name: str,  debug: bool = False, cache_dir: Optional[str] = None) -> None:
+    def __init__(self, model_name: str,  debug: bool = False, use_gpu: bool = False, cache_dir: Optional[str] = None) -> None:
         self.debug = debug
-        self.device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+        self.device = torch.device("cuda:0" if torch.cuda.is_available() and use_gpu else "cpu")
         self.tokenizer = AutoTokenizer.from_pretrained(model_name, trust_remote_code=True)
         self.model = AutoModelForCausalLM.from_pretrained(model_name, trust_remote_code=True, torch_dtype=torch.float16).to(self.device)
         
@@ -77,11 +77,16 @@ Assistant:"""
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--data", default="small_subset.csv", type=str)
-    parser.add_argument("--model_name", type=str, required=True)
     parser.add_argument("--languages", default=["en", "cz", "sk"], nargs="+")
+    parser.add_argument("--model_path", default=None, type=str)
+    parser.add_argument("--use_gpu", default=False, action=argparse.BooleanOptionalAction)
     args = parser.parse_args()
     
-    model = Eagle("/data/MSpiegel/eagle-7b", debug=True, cache_dir="/mnt/michal.spiegel")
+    if args.model_path:
+        model = Eagle(args.model_path, use_gpu=args.use_gpu, debug=True)
+    else:
+        model = Eagle("RWKV/v5-Eagle-7B-HF", use_gpu=args.use_gpu, debug=True)
+        
     df = pd.read_csv(args.data)
     df = df[df["language"].isin(args.languages)]
     df = df[["text", "language", "source"]]
