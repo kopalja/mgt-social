@@ -32,7 +32,7 @@ class Vicuna:
             return response
         except Exception as e:
             print(f"Exception during inference: {e}")
-            return "Exception during inference"
+            return f"Exception during inference {e}"
 
     def __post_process_output(self, prompt: str, text: str) -> str:
         text = text[len(prompt):].strip()

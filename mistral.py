@@ -31,7 +31,7 @@ class Mistral:
             return response.split("[/INST]")[-1]
         except Exception as e:
             print(f"Exception during inference: {e}")
-            return "Exception during inference"
+            return f"Exception during inference {e}"
 
 
     def paraphrase(self, text: str, language: str, iterations: int = 3):
