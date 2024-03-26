@@ -11,7 +11,11 @@ from misc import LANGUAGE_CODE_MAP
 
 
 class Opt:
-    def __init__(self, model_name: str,  debug: bool = False, use_gpu: bool = False, cache_dir: Optional[str] = None) -> None:
+    def __init__(self, model_name: Optional[str],  debug: bool = False, use_gpu: bool = False, cache_dir: Optional[str] = None) -> None:
+
+        if model_name is None:
+            model_name = "facebook/opt-iml-max-30b"
+            
         self.debug = debug
         self.device = torch.device("cuda:0" if torch.cuda.is_available() and use_gpu else "cpu")
         self.tokenizer = AutoTokenizer.from_pretrained(model_name, cache_dir=cache_dir, use_fast=False)
@@ -68,11 +72,7 @@ if __name__ == "__main__":
     parser.add_argument("--use_gpu", default=False, action=argparse.BooleanOptionalAction)
     args = parser.parse_args()
     
-    if args.model_path:
-        opt = Opt(args.model_path, use_gpu=args.use_gpu, debug=True)
-    else:
-        opt = Opt("facebook/opt-iml-max-30b", use_gpu=args.use_gpu, debug=True)
-
+    opt = Opt(args.model_path, use_gpu=args.use_gpu, debug=True)
     df = pd.read_csv(args.data)
     df = df[df["language"].isin(args.languages)]
     df = df[["text", "language", "source"]]

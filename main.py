@@ -59,7 +59,7 @@ if __name__ == "__main__":
     parser.add_argument("--vicuna_path", default="/mnt/dominik.macko/vicuna-13b", type=str)
     parser.add_argument("--mistral_path", default="/mnt/jakub.kopal/models--mistralai--Mistral-7B-Instruct-v0.1/snapshots/73068f3702d050a2fd5aa2ca1e612e5036429398", type=str)
     parser.add_argument("--eagle_path", default="/mnt/michal.spiegel/models/eagle-7b", type=str)
-    parser.add_argument("--opt_path", required=True, type=str)
+    parser.add_argument("--opt_path", default=None, type=str)
     parser.add_argument("--languages", default=["en", "pt", "de", "nl", "es", "ru", "pl"], nargs="+")
     parser.add_argument("--type", type=GenerationType, choices=list(GenerationType), default=GenerationType.k_to_one)
     parser.add_argument("--model_name", type=str, required=True)
