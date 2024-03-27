@@ -7,7 +7,7 @@ import torch
 from transformers import AutoTokenizer, AutoModelForCausalLM
                           
 
-from misc import LANGUAGE_CODE_MAP
+from misc import LANGUAGE_CODE_MAP, MODEL_GENERATE_ARGS
 
 
 class Opt:
@@ -25,7 +25,7 @@ class Opt:
         try:
             encoded_input = self.tokenizer.encode(inpt, return_tensors="pt").to(self.device)
             with torch.no_grad():
-                output = self.model.generate(encoded_input, min_new_tokens=0, max_new_tokens=100, num_return_sequences=1, do_sample=True, num_beams=1, top_k=50, top_p=0.95)
+                output = self.model.generate(encoded_input, **MODEL_GENERATE_ARGS)
             response = self.tokenizer.batch_decode(output, skip_special_tokens=True)[0]
                 
             if self.debug:

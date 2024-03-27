@@ -7,7 +7,7 @@ import torch
 from transformers import AutoModelForCausalLM, AutoTokenizer
                           
 
-from misc import LANGUAGE_CODE_MAP
+from misc import LANGUAGE_CODE_MAP, MODEL_GENERATE_ARGS
 
 
 class Mistral:
@@ -21,9 +21,7 @@ class Mistral:
         try:
             encoded_input = self.tokenizer.apply_chat_template(inpt, return_tensors="pt")
             with torch.no_grad():
-                output = self.model.generate(
-                    encoded_input.to(self.device), max_new_tokens=1000000, min_length=0, do_sample=False, pad_token_id=self.tokenizer.eos_token_id
-                )
+                output = self.model.generate(encoded_input.to(self.device), **MODEL_GENERATE_ARGS)
             response = self.tokenizer.batch_decode(output, skip_special_tokens=True)[0]
             if self.debug:
                 print(f"############## Prompt ##############\n{inpt}")
@@ -57,6 +55,12 @@ class Mistral:
         messages.append({"role": "assistant", "content": f"GENERATED TEXT: {texts[k+1]}"})
         messages.append({"role": "user", "content": intro + ' '.join([ f"EXAMPLE {idx+1}: {text}" for idx, text in enumerate(texts[k+2:])])})
         return self.query(messages)
+        
+    def keywords(self, keywords: List[str], language: str) -> str:
+        instruction = f"Generate sentense in {LANGUAGE_CODE_MAP[language]} containing the following words: {', '.join(keywords)}"
+        messages = [{"role": "user", "content": instruction}]
+        output = self.query(messages).strip(' "')
+        return output
         
         
 

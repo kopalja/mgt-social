@@ -46,3 +46,24 @@ LANGUAGE_CODE_MAP = {
     "uk": "ukrainian",
     "ro": "romanian",
 }
+
+
+MODEL_GENERATE_ARGS = {
+    "min_new_tokens": 0,
+    "max_new_tokens": 100,
+    "num_return_sequences": 1,
+    "do_sample": True,
+    "num_beams": 1,
+    "top_k": 50,
+    "top_p": 0.95
+}
+
+def generate_chat_prompt(instruction):
+    instruction = instruction.strip().replace('\r\n','\n').replace('\n\n','\n')
+    return f"""User: hi
+
+Assistant: Hi. I am your assistant and I will provide expert full response in full details. Please feel free to ask any question and I will always answer it.
+
+User: {instruction}
+
+Assistant:"""

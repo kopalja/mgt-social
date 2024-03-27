@@ -4,13 +4,12 @@ from enum import Enum
 
 import pandas as pd
 
-from misc import LANGUAGE_CODE_MAP
 from vicuna import Vicuna
 from mistral import Mistral
 from gemini import Gemini
 from eagle import Eagle
 from opt import Opt
-from spacy_tagging import spacy_keywords
+from spacy_tagging import spacy_keywords, long_words
 from summarizer import Summarizer
 
 
@@ -22,15 +21,6 @@ class GenerationType(Enum):
 
     def __str__(self):
         return self.value
-
-
-def spacy(gemini, text: str, language: str):
-    print("### Inpt", text)
-    keywords = spacy_keywords(text, language)
-    prompt = f"Generate sentense in {LANGUAGE_CODE_MAP[language]} containing the following words: {', '.join(keywords)}"
-    result = gemini.query(prompt)
-    return result
-
 
 
 
@@ -98,7 +88,7 @@ if __name__ == "__main__":
             if args.type == GenerationType.paraphrase:
                 data["output"].append(model.paraphrase(row.text, row.language))
             elif args.type == GenerationType.keywords:
-                data["output"].append(spacy(model, row.text, row.language))
+                data["output"].append(model.keywords(long_words(row.text), row.language))
             elif args.type == GenerationType.summarizer:
                 summ = summarizer.process(row.text, row.language)
                 data["output"].append(model.paraphrase(summ, row.language, iterations=1))

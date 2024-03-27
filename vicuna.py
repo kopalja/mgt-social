@@ -7,7 +7,7 @@ import torch
 from transformers import LlamaForCausalLM, LlamaTokenizer
                           
 
-from misc import LANGUAGE_CODE_MAP
+from misc import LANGUAGE_CODE_MAP, MODEL_GENERATE_ARGS, generate_chat_prompt
 
 
 class Vicuna:
@@ -21,9 +21,7 @@ class Vicuna:
         try:
             encoded_input = self.tokenizer.encode(inpt, return_tensors="pt", truncation=True)
             with torch.no_grad():
-                output = self.model.generate(
-                    encoded_input.to(self.device), max_new_tokens=1000, min_length=0, do_sample=False
-                )
+                output = self.model.generate(encoded_input.to(self.device), **MODEL_GENERATE_ARGS)
             response = self.tokenizer.batch_decode(output, skip_special_tokens=True)[0]
                 
             if self.debug:
@@ -67,6 +65,14 @@ class Vicuna:
         current += "GENERATED TEXT:"
         prompt = f"{intro}\n{examples}\n{current}"
         return self.query(prompt)
+
+    def keywords(self, keywords: List[str], language: str) -> str:
+        instruction = f"Generate sentense in {LANGUAGE_CODE_MAP[language]} containing the following words: {', '.join(keywords)}"
+        prompt = generate_chat_prompt(instruction)
+        raw_output = self.query(prompt)
+        output = raw_output[len(prompt):]
+        return output.split('User:')[0].strip(' "')
+        
         
         
 

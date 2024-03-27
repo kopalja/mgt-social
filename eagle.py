@@ -7,7 +7,7 @@ import torch
 from transformers import AutoModelForCausalLM, AutoTokenizer
                           
 
-from misc import LANGUAGE_CODE_MAP
+from misc import LANGUAGE_CODE_MAP, MODEL_GENERATE_ARGS, generate_chat_prompt
 
 
 class Eagle:
@@ -18,12 +18,10 @@ class Eagle:
         self.model = AutoModelForCausalLM.from_pretrained(model_name, trust_remote_code=True, torch_dtype=torch.float16).to(self.device)
         
     def query(self, instruction: str) -> str:
-        input = generate_prompt(instruction)
+        input = generate_chat_prompt(instruction)
         encoded_input = self.tokenizer.encode(input, return_tensors="pt", truncation=True)
         with torch.no_grad():
-            output = self.model.generate(
-                encoded_input.to(self.device), min_new_tokens=0, max_new_tokens=100, num_return_sequences=1, do_sample=True, num_beams=1, top_k=50, top_p=0.95
-            )
+            output = self.model.generate(encoded_input.to(self.device), **MODEL_GENERATE_ARGS)
         response = self.tokenizer.batch_decode(output, skip_special_tokens=True)[0]
         if self.debug:
             print(f"############## Prompt ##############\n{input}")
@@ -53,24 +51,11 @@ class Eagle:
         prompt = f"{intro}\n{examples}\n{current}"
         return self.query(prompt)
 
-
-def generate_prompt(instruction, input=""):
-    instruction = instruction.strip().replace('\r\n','\n').replace('\n\n','\n')
-    input = input.strip().replace('\r\n','\n').replace('\n\n','\n')
-    if input:
-        return f"""Instruction: {instruction}
-
-Input: {input}
-
-Response:"""
-    else:
-        return f"""User: hi
-
-Assistant: Hi. I am your assistant and I will provide expert full response in full details. Please feel free to ask any question and I will always answer it.
-
-User: {instruction}
-
-Assistant:"""
+    def keywords(self, keywords: List[str], language: str) -> str:
+        instruction = f"Generate sentense in {LANGUAGE_CODE_MAP[language]} containing the following words: {', '.join(keywords)}"
+        raw_output = self.query(instruction)
+        output = raw_output[len(generate_chat_prompt(instruction)):]
+        return output.split('User:')[0]
 
 
 
