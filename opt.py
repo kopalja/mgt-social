@@ -19,7 +19,6 @@ class Opt:
         self.debug = debug
         self.device = torch.device("cuda:0" if torch.cuda.is_available() and use_gpu else "cpu")
         self.tokenizer = AutoTokenizer.from_pretrained(model_name, cache_dir=cache_dir, use_fast=False)
-        # self.model = AutoModelForCausalLM.from_pretrained(model_name, cache_dir=cache_dir).to(self.device)
         self.model = AutoModelForCausalLM.from_pretrained(model_name, load_in_4bit=True, cache_dir=cache_dir)
         
     def query(self, inpt: str) -> str:

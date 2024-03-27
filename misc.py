@@ -39,5 +39,10 @@ LANGUAGE_CODE_MAP = {
     "ru": "russian",
     "pl": "polish",
     "sk": "slovak language",
-    "cz": "czech"
+    "cz": "czech",
+    "ar": "arabic",
+    "bg": "bulgarian",
+    "ca": "catalan",
+    "uk": "ukrainian",
+    "ro": "romanian",
 }

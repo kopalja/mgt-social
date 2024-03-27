@@ -4,6 +4,7 @@ from enum import Enum
 
 import pandas as pd
 
+from misc import LANGUAGE_CODE_MAP
 from vicuna import Vicuna
 from mistral import Mistral
 from gemini import Gemini
@@ -26,7 +27,7 @@ class GenerationType(Enum):
 def spacy(gemini, text: str, language: str):
     print("### Inpt", text)
     keywords = spacy_keywords(text, language)
-    prompt = f"Generate sentense in {gemini.language_code_to_name[language]} containing the following words: {', '.join(keywords)}"
+    prompt = f"Generate sentense in {LANGUAGE_CODE_MAP[language]} containing the following words: {', '.join(keywords)}"
     result = gemini.query(prompt)
     return result
 
@@ -60,8 +61,8 @@ if __name__ == "__main__":
     parser.add_argument("--mistral_path", default="/mnt/jakub.kopal/models--mistralai--Mistral-7B-Instruct-v0.1/snapshots/73068f3702d050a2fd5aa2ca1e612e5036429398", type=str)
     parser.add_argument("--eagle_path", default="/mnt/michal.spiegel/models/eagle-7b", type=str)
     parser.add_argument("--opt_path", default=None, type=str)
-    parser.add_argument("--languages", default=["en", "pt", "de", "nl", "es", "ru", "pl"], nargs="+")
-    parser.add_argument("--type", type=GenerationType, choices=list(GenerationType), default=GenerationType.k_to_one)
+    parser.add_argument("--languages", default=["en", "pt", "de", "nl", "es", "ru", "pl", "ar", "bg", "ca", "uk", "pl", "ro"], nargs="+")
+    parser.add_argument("--type", type=GenerationType, choices=list(GenerationType), default=GenerationType.keywords)
     parser.add_argument("--model_name", type=str, required=True)
     args = parser.parse_args()
 
@@ -70,15 +71,15 @@ if __name__ == "__main__":
     if args.model_name == "gemini":
         model = Gemini(args.gemini_project_name, args.gemini_location, args.gemini_model_name, debug=True)
     elif args.model_name == "vicuna":
-        model = Vicuna(args.vicuna_path , debug=True)
+        model = Vicuna(args.vicuna_path , debug=True, use_gpu=True)
     elif args.model_name == "mistral":
-        model = Mistral(args.mistral_path , debug=True)
+        model = Mistral(args.mistral_path , debug=True, use_gpu=True)
     elif args.model_name == "eagle":
-        model = Eagle(args.eagle_path, debug=True)
+        model = Eagle(args.eagle_path, debug=True, use_gpu=True)
     elif args.model_name == "opt":
         model = Opt(args.opt_path, debug=True, use_gpu=True)
     else:
-        raise Exception(f"Unsupported model type: {args.model_name}. Supported model names are: `gemini`, `vicuna`, `mistral`, `eagle`.")
+        raise Exception(f"Unsupported model type: {args.model_name}. Supported model names are: `gemini`, `vicuna`, `mistral`, `eagle`, `opt`.")
 
     # 2) Preprocess data
     df = pd.read_csv(args.data)
