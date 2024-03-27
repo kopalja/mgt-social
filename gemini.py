@@ -76,6 +76,10 @@ class Gemini:
         current += "GENERATED TEXT:"
         prompt = f"{intro}\n{examples}\n{current}"
         return self.query(prompt)
+        
+    def keywords(self, keywords: List[str], language: str) -> str:
+        instruction = f"Generate sentense in {LANGUAGE_CODE_MAP[language]} containing the following words: {', '.join(keywords)}"
+        return self.query(f'{JAILBREAK} {instruction}')[len("JailBreak: ")]
 
 
 if __name__ == "__main__":
