@@ -63,10 +63,7 @@ class Falcon:
         
     def keywords(self, keywords: List[str], language: str) -> str:
         prompt = f"Generate sentense in {LANGUAGE_CODE_MAP[language]} containing the following words: {', '.join(keywords)}"
-        output = self.query(prompt)
-        if len(output) > len(prompt):
-            output = output[len(prompt):]
-        return output
+        return self.query(prompt)
         
         
 

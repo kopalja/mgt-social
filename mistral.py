@@ -65,8 +65,7 @@ class Mistral:
     def keywords(self, keywords: List[str], language: str) -> str:
         instruction = f"Generate sentense in {LANGUAGE_CODE_MAP[language]} containing the following words: {', '.join(keywords)}"
         messages = [{"role": "user", "content": instruction}]
-        output = self.query(messages).strip(' "')
-        return output
+        return self.query(messages).strip(' "')
         
         
 

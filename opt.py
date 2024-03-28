@@ -7,7 +7,7 @@ import torch
 from transformers import AutoTokenizer, AutoModelForCausalLM
                           
 
-from misc import LANGUAGE_CODE_MAP, MODEL_GENERATE_ARGS, get_logger
+from misc import LANGUAGE_CODE_MAP, MODEL_GENERATE_ARGS
 
 
 class Opt:
@@ -61,6 +61,9 @@ class Opt:
         prompt = f"{intro}\n{examples}\n{current}"
         return self.query(prompt)
         
+    def keywords(self, keywords: List[str], language: str) -> str:
+        prompt = f"Generate sentense in {LANGUAGE_CODE_MAP[language]} containing the following words: {', '.join(keywords)}"
+        return self.query(prompt)
         
 
 if __name__ == "__main__":

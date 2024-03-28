@@ -28,13 +28,13 @@ class Vicuna:
             if self.debug:
                 print(f"############## Prompt ##############\n{inpt}")
                 print(f"############## Response ##############\n{response}")
-            return response
+            return response[len(inpt):]
         except Exception as e:
             self.logger.error(f"Exception during Vicuna inference: {e}")
             return ""
 
     def __post_process_output(self, prompt: str, text: str) -> str:
-        text = text[len(prompt):].strip()
+        text = text.strip()
         if 'Paraphrased text:' in text:
             text = text.split('Paraphrased text:')[1].strip().strip('"')  
         if self.debug:
@@ -65,17 +65,12 @@ class Vicuna:
             current += f"EXAMPLE {i+1}: {text}\n"
         current += "GENERATED TEXT:"
         prompt = f"{intro}\n{examples}\n{current}"
-        response = self.query(prompt)
-        if len(response) > len(prompt):
-            return response[len(prompt):]
-        return response
+        return self.query(prompt)
 
     def keywords(self, keywords: List[str], language: str) -> str:
         instruction = f"Generate sentense in {LANGUAGE_CODE_MAP[language]} containing the following words: {', '.join(keywords)}"
         prompt = generate_chat_prompt(instruction)
         output = self.query(prompt)
-        if len(output) > len(prompt):
-            output = output[len(prompt):]
         return output.split('User:')[0].strip(' "')
         
         
