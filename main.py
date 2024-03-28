@@ -43,6 +43,7 @@ def k_to_one(model, data: pd.DataFrame, k: int = 6, examples_per_group: int  = 3
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--data", default="small_subset.csv", type=str)
+    parser.add_argument("--output_root_dir", default="output", type=str)
     parser.add_argument("--summarizer_model", default="Falconsai/text_summarization", type=str)
     parser.add_argument("--gemini_project_name", default="mgt-social", type=str)
     parser.add_argument("--gemini_model_name", default="gemini-1.0-pro", type=str)
@@ -76,8 +77,12 @@ if __name__ == "__main__":
     df = df[df["language"].isin(args.languages)]
     df = df[["text", "language", "source"]]
 
+    output_dir = os.path.join(args.output_root_dir, args.model_name)
+    os.makedirs(args.output_root_dir, exist_ok=True)
+    os.makedirs(output_dir, exist_ok=True)
+
     if args.type == GenerationType.k_to_one:
-        pd.DataFrame(k_to_one(model, df, k=3)).to_csv(os.path.join("data", args.model_name, "data_k_to_one.csv"), index=False)
+        pd.DataFrame(k_to_one(model, df, k=3)).to_csv(os.path.join(output_dir, "data_k_to_one.csv"), index=False)
     else:
         data = dict([(n, []) for n in ["input", "output", "language", "source"]])
         for row in df.itertuples():
@@ -92,4 +97,4 @@ if __name__ == "__main__":
             elif args.type == GenerationType.summarizer:
                 summ = summarizer.process(row.text, row.language)
                 data["output"].append(model.paraphrase(summ, row.language, iterations=1))
-        pd.DataFrame(data=data).to_csv(os.path.join("data", args.model_name, f"data_{args.type}.csv"), index=False)
+        pd.DataFrame(data=data).to_csv(os.path.join(output_dir, f"data_{args.type}.csv"), index=False)

@@ -7,7 +7,7 @@ import torch
 from transformers import AutoModelForCausalLM, AutoTokenizer
                           
 
-from misc import LANGUAGE_CODE_MAP, MODEL_GENERATE_ARGS
+from misc import LANGUAGE_CODE_MAP, MODEL_GENERATE_ARGS, get_logger
 
 
 class Mistral:
@@ -16,6 +16,7 @@ class Mistral:
         self.device = torch.device("cuda:0" if torch.cuda.is_available() and use_gpu else "cpu")
         self.tokenizer = AutoTokenizer.from_pretrained(model_name, cache_dir=cache_dir)
         self.model = AutoModelForCausalLM.from_pretrained(model_name, load_in_4bit=True, cache_dir=cache_dir)
+        self.logger = get_logger("models")
         
     def query(self, inpt: str) -> str:
         try:
@@ -28,8 +29,8 @@ class Mistral:
                 print(f"############## Response ##############\n{response}")
             return response.split("[/INST]")[-1]
         except Exception as e:
-            print(f"Exception during inference: {e}")
-            return f"Exception during inference {e}"
+            self.logger.error(f"Exception during Mistral inference: {e}")
+            return ""
 
 
     def paraphrase(self, text: str, language: str, iterations: int = 3):
@@ -54,7 +55,12 @@ class Mistral:
         messages.append({"role": "user", "content": intro + ' '.join([ f"EXAMPLE {idx+1}: {text}" for idx, text in enumerate(texts[:k+1])])})
         messages.append({"role": "assistant", "content": f"GENERATED TEXT: {texts[k+1]}"})
         messages.append({"role": "user", "content": intro + ' '.join([ f"EXAMPLE {idx+1}: {text}" for idx, text in enumerate(texts[k+2:])])})
-        return self.query(messages)
+        response = self.query(messages)
+        for prefix in ["GENERATED TEXT:", "Generated Text:", "I'll generate a short text for you:"]:
+            if prefix in response:
+                response = response.split(prefix)[1].strip()
+                break
+        return response
         
     def keywords(self, keywords: List[str], language: str) -> str:
         instruction = f"Generate sentense in {LANGUAGE_CODE_MAP[language]} containing the following words: {', '.join(keywords)}"

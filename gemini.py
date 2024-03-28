@@ -7,7 +7,7 @@ import vertexai
 from vertexai.generative_models import (GenerationConfig, GenerativeModel,
                                         HarmBlockThreshold, HarmCategory)
 
-from misc import LANGUAGE_CODE_MAP, JAILBREAK
+from misc import LANGUAGE_CODE_MAP, JAILBREAK, get_logger
 
 STOP_PREFIX = [
     "I am sorry, I cannot",
@@ -37,6 +37,7 @@ class Gemini:
             HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT: HarmBlockThreshold.BLOCK_NONE,
             HarmCategory.HARM_CATEGORY_UNSPECIFIED: HarmBlockThreshold.BLOCK_NONE,
         }
+        self.logger = get_logger("models")
 
     def query(self, inpt: str, sleep: int = 2) -> str:
         try:
@@ -49,8 +50,8 @@ class Gemini:
             time.sleep(sleep)
             return response
         except Exception as e:
-            print(f"Error when asking gemini: {e}")
-            return "No response from Gemini."
+            self.logger.error(f"Error when asking gemini: {e}")
+            return "JailBreak: Error when asking gemini"
 
     def paraphrase(self, text: str, language: str, iterations: int = 3, repetitions_per_iteration: int = 5):
         instruction = f"Your ultimate goal is to rephrase in {LANGUAGE_CODE_MAP[language]} using different words and sentence composition the following text:"

@@ -7,7 +7,7 @@ import torch
 from transformers import AutoTokenizer, AutoModelForCausalLM
                           
 
-from misc import LANGUAGE_CODE_MAP, MODEL_GENERATE_ARGS
+from misc import LANGUAGE_CODE_MAP, MODEL_GENERATE_ARGS, get_logger
 
 
 class Opt:
@@ -15,11 +15,11 @@ class Opt:
 
         if model_name is None:
             model_name = "facebook/opt-iml-max-30b"
-            
         self.debug = debug
         self.device = torch.device("cuda:0" if torch.cuda.is_available() and use_gpu else "cpu")
         self.tokenizer = AutoTokenizer.from_pretrained(model_name, cache_dir=cache_dir, use_fast=False)
         self.model = AutoModelForCausalLM.from_pretrained(model_name, load_in_4bit=True, cache_dir=cache_dir)
+        self.logger = get_logger("models")
         
     def query(self, inpt: str) -> str:
         try:
@@ -33,8 +33,8 @@ class Opt:
                 print(f"############## Response ##############\n{response}")
             return response[len(inpt):]
         except Exception as e:
-            print(f"Exception during inference: {e}")
-            return f"Exception during inference {e}"
+            self.logger.error(f"Exception during Opt-iml inference: {e}")
+            return ""
 
     def paraphrase(self, text: str, language: str, iterations: int = 3):
         instruction = f"Your goal is to paraphrase text in {LANGUAGE_CODE_MAP[language]} using different words and sentence composition. Responde with only paraphrased text and nothing else. Text to paraphrase:"

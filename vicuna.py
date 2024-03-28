@@ -7,7 +7,7 @@ import torch
 from transformers import LlamaForCausalLM, LlamaTokenizer
                           
 
-from misc import LANGUAGE_CODE_MAP, MODEL_GENERATE_ARGS, generate_chat_prompt
+from misc import LANGUAGE_CODE_MAP, MODEL_GENERATE_ARGS, generate_chat_prompt, get_logger
 
 
 class Vicuna:
@@ -16,6 +16,7 @@ class Vicuna:
         self.device = torch.device("cuda:0" if torch.cuda.is_available() and use_gpu else "cpu")
         self.tokenizer = LlamaTokenizer.from_pretrained(model_name, cache_dir=cache_dir)
         self.model = LlamaForCausalLM.from_pretrained(model_name, load_in_4bit=True, cache_dir=cache_dir)
+        self.logger = get_logger("models")
         
     def query(self, inpt: str) -> str:
         try:
@@ -29,8 +30,8 @@ class Vicuna:
                 print(f"############## Response ##############\n{response}")
             return response
         except Exception as e:
-            print(f"Exception during inference: {e}")
-            return f"Exception during inference {e}"
+            self.logger.error(f"Exception during Vicuna inference: {e}")
+            return ""
 
     def __post_process_output(self, prompt: str, text: str) -> str:
         text = text[len(prompt):].strip()
@@ -64,13 +65,17 @@ class Vicuna:
             current += f"EXAMPLE {i+1}: {text}\n"
         current += "GENERATED TEXT:"
         prompt = f"{intro}\n{examples}\n{current}"
-        return self.query(prompt)
+        response = self.query(prompt)
+        if len(response) > len(prompt):
+            return response[len(prompt):]
+        return response
 
     def keywords(self, keywords: List[str], language: str) -> str:
         instruction = f"Generate sentense in {LANGUAGE_CODE_MAP[language]} containing the following words: {', '.join(keywords)}"
         prompt = generate_chat_prompt(instruction)
-        raw_output = self.query(prompt)
-        output = raw_output[len(prompt):]
+        output = self.query(prompt)
+        if len(output) > len(prompt):
+            output = output[len(prompt):]
         return output.split('User:')[0].strip(' "')
         
         

@@ -1,3 +1,6 @@
 data/*
+data_backup/*
+output/*
 __pycache__
 job.log
+logs/*.log

@@ -1,0 +1,47 @@
+{
+    "version": 1,
+    "disable_existing_loggers": false,
+    "formatters": {
+      "simple": {
+        "format": "%(asctime)s - %(levelname)-5s - %(name)-7s - %(message)s"
+      },
+      "message_only": {
+        "format": "%(message)s"
+      }
+    },
+    "handlers": {
+      "console_stderr": {
+            "class": "logging.StreamHandler",
+            "level": "ERROR",
+            "formatter": "simple",
+            "stream": "sys.stderr"
+        },
+        "models_debug": {
+            "class": "logging.handlers.RotatingFileHandler",
+            "level": "DEBUG",
+            "formatter": "simple",
+            "filename": "logs/models_debug.log",
+            "maxBytes": 20000000,
+            "backupCount": 20,
+            "encoding": "utf-8"
+        },
+        "models_error": {
+            "class": "logging.handlers.RotatingFileHandler",
+            "level": "ERROR",
+            "formatter": "simple",
+            "filename": "logs/models_error.log",
+            "maxBytes": 5000000,
+            "backupCount": 20,
+            "encoding": "utf-8"
+        }
+    },
+
+    "loggers": {
+        "models": {
+            "level": "DEBUG",
+            "handlers": ["console_stderr", "models_debug", "models_error"],
+            "propagate": false
+          }
+      },
+    "root": {}
+}
