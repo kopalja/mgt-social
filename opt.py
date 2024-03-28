@@ -7,7 +7,7 @@ import torch
 from transformers import AutoTokenizer, AutoModelForCausalLM
                           
 
-from misc import LANGUAGE_CODE_MAP, MODEL_GENERATE_ARGS
+from misc import LANGUAGE_CODE_MAP, MODEL_GENERATE_ARGS, get_logger
 
 
 class Opt:
