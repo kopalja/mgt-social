@@ -28,3 +28,7 @@ def spacy_keywords(text: str, lang: str, sample_size: int = 2) -> List[str]:
 
     random.shuffle(keywords)
     return keywords[:sample_size]
+
+
+if __name__ == "__main__":
+    print(long_words("Hello my na is Jon and I live in Uk.")) # ['Hello', 'live']
