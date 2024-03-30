@@ -74,7 +74,7 @@ if __name__ == "__main__":
     elif args.model_name == "opt":
         model = Opt(args.opt_path, debug=True, use_gpu=True, cache_dir=args.cache_dir)
     elif args.model_name == "falcon":
-        model = Opt(args.falcon_path, debug=True, use_gpu=True, cache_dir=args.cache_dir)
+        model = Falcon(args.falcon_path, debug=True, use_gpu=True, cache_dir=args.cache_dir)
     elif args.model_name == "aya":
         model = Aya(args.aya_path, debug=True, use_gpu=True, cache_dir=args.cache_dir)
     else:
