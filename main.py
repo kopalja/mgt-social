@@ -9,6 +9,7 @@ from mistral import Mistral
 from gemini import Gemini
 from eagle import Eagle
 from opt import Opt
+from aya import Aya
 from spacy_tagging import spacy_keywords, long_words
 from summarizer import Summarizer
 
@@ -52,10 +53,12 @@ if __name__ == "__main__":
     parser.add_argument("--mistral_path", default="/mnt/jakub.kopal/models--mistralai--Mistral-7B-Instruct-v0.1/snapshots/73068f3702d050a2fd5aa2ca1e612e5036429398", type=str)
     parser.add_argument("--eagle_path", default="/mnt/michal.spiegel/models/eagle-7b", type=str)
     parser.add_argument("--opt_path", default=None, type=str)
+    parser.add_argument("--aya_path", type=str)
     parser.add_argument("--falcon_path", default=None, type=str)
     parser.add_argument("--languages", default=["en", "pt", "de", "nl", "es", "ru", "pl", "ar", "bg", "ca", "uk", "pl", "ro"], nargs="+")
     parser.add_argument("--type", type=GenerationType, choices=list(GenerationType), default=GenerationType.keywords)
     parser.add_argument("--model_name", type=str, required=True)
+    parser.add_argument("--cache_dir", type=str, default=".cache")
     args = parser.parse_args()
 
     # 1) Create models
@@ -63,15 +66,17 @@ if __name__ == "__main__":
     if args.model_name == "gemini":
         model = Gemini(args.gemini_project_name, args.gemini_location, args.gemini_model_name, debug=True)
     elif args.model_name == "vicuna":
-        model = Vicuna(args.vicuna_path , debug=True, use_gpu=True)
+        model = Vicuna(args.vicuna_path , debug=True, use_gpu=True, cache_dir=args.cache_dir)
     elif args.model_name == "mistral":
-        model = Mistral(args.mistral_path , debug=True, use_gpu=True)
+        model = Mistral(args.mistral_path , debug=True, use_gpu=True, cache_dir=args.cache_dir)
     elif args.model_name == "eagle":
-        model = Eagle(args.eagle_path, debug=True, use_gpu=True)
+        model = Eagle(args.eagle_path, debug=True, use_gpu=True, cache_dir=args.cache_dir)
     elif args.model_name == "opt":
-        model = Opt(args.opt_path, debug=True, use_gpu=True)
+        model = Opt(args.opt_path, debug=True, use_gpu=True, cache_dir=args.cache_dir)
     elif args.model_name == "falcon":
-        model = Opt(args.falcon_path, debug=True, use_gpu=True)
+        model = Opt(args.falcon_path, debug=True, use_gpu=True, cache_dir=args.cache_dir)
+    elif args.model_name == "aya":
+        model = Aya(args.aya_path, debug=True, use_gpu=True, cache_dir=args.cache_dir)
     else:
         raise Exception(f"Unsupported model type: {args.model_name}. Supported model names are: `gemini`, `vicuna`, `mistral`, `eagle`, `opt`.")
 
@@ -94,6 +99,7 @@ if __name__ == "__main__":
             data["input"].append(row.text)
 
             if args.type == GenerationType.paraphrase:
+                print("paraphrasing")
                 data["output"].append(model.paraphrase(row.text, row.language))
             elif args.type == GenerationType.keywords:
                 data["output"].append(model.keywords(long_words(row.text), row.language))
