@@ -15,19 +15,19 @@ class Mistral:
         self.debug = debug
         self.device = torch.device("cuda:0" if torch.cuda.is_available() and use_gpu else "cpu")
         self.tokenizer = AutoTokenizer.from_pretrained(model_name, cache_dir=cache_dir)
-        self.model = AutoModelForCausalLM.from_pretrained(model_name, load_in_4bit=True, cache_dir=cache_dir)
+        self.model = AutoModelForCausalLM.from_pretrained(model_name, torch_dtype=torch.float16, cache_dir=cache_dir).to(self.device)
         self.logger = get_logger("models")
         
     def query(self, inpt: str) -> str:
         try:
-            encoded_input = self.tokenizer.apply_chat_template(inpt, return_tensors="pt")
+            encoded_input = self.tokenizer.encode(inpt, return_tensors="pt")
             with torch.no_grad():
                 output = self.model.generate(encoded_input.to(self.device), **MODEL_GENERATE_ARGS)
             response = self.tokenizer.batch_decode(output, skip_special_tokens=True)[0]
             if self.debug:
                 print(f"############## Prompt ##############\n{inpt}")
                 print(f"############## Response ##############\n{response}")
-            return response.split("[/INST]")[-1]
+            return response #.split("[/INST]")[-1]
         except Exception as e:
             self.logger.error(f"Exception during Mistral inference: {e}")
             return ""
@@ -35,9 +35,10 @@ class Mistral:
 
     def paraphrase(self, text: str, language: str, iterations: int = 3):
         inpt = text
-        instruction = f"Your goal is to paraphrase text in {LANGUAGE_CODE_MAP[language]} using different words and sentence composition. Responde with only paraphrased text and nothing else. Text to paraphrase:"
+        #instruction = f"Your goal is to paraphrase text in {LANGUAGE_CODE_MAP[language]} using different words and sentence composition. Responde with only paraphrased text and nothing else. Text to paraphrase:"
+        prompt = f"{text}\n"
         for _ in range(iterations):
-            prompt = [{"role": "user", "content": f"{instruction} {text}"}]
+            #prompt = [{"role": "user", "content": f"{instruction} {text}"}]
             response = self.query(prompt)
             if response != "":
                 text = response
@@ -50,12 +51,14 @@ class Mistral:
         
     def similar_to_n(self, texts: List[str], language: str, k: int):
         # TODO: Doesn't perform well. Aparently too complex prompt.
-        intro = f"You are a helpful assistant. Generate a short text similar to the following examples. The text must be in {LANGUAGE_CODE_MAP[language]} language.\n"
-        messages = []
-        messages.append({"role": "user", "content": intro + ' '.join([ f"EXAMPLE {idx+1}: {text}" for idx, text in enumerate(texts[:k+1])])})
-        messages.append({"role": "assistant", "content": f"GENERATED TEXT: {texts[k+1]}"})
-        messages.append({"role": "user", "content": intro + ' '.join([ f"EXAMPLE {idx+1}: {text}" for idx, text in enumerate(texts[k+2:])])})
-        response = self.query(messages)
+        #intro = f"You are a helpful assistant. Generate a short text similar to the following examples. The text must be in {LANGUAGE_CODE_MAP[language]} language.\n"
+        #messages = []
+        #messages.append({"role": "user", "content": intro + ' '.join([ f"EXAMPLE {idx+1}: {text}" for idx, text in enumerate(texts[:k+1])])})
+        #messages.append({"role": "assistant", "content": f"GENERATED TEXT: {texts[k+1]}"})
+        #messages.append({"role": "user", "content": intro + ' '.join([ f"EXAMPLE {idx+1}: {text}" for idx, text in enumerate(texts[k+2:])])})
+        joined = "\n".join(texts)
+        prompt = f"{joined}\n"
+        response = self.query(prompt)
         for prefix in ["GENERATED TEXT:", "Generated Text:", "I'll generate a short text for you:"]:
             if prefix in response:
                 response = response.split(prefix)[1].strip()
