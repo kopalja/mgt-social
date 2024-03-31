@@ -17,6 +17,7 @@ PROMPTS = [
 Input: {text}
 
 Response:""",
+"{text}\n"
 #"""User: hi
 #
 #Assistant: Hi. I am your assistant and I will provide expert full response in full details. Please feel free to ask any question and I will always answer it.
