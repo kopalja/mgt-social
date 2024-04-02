@@ -80,5 +80,5 @@ if __name__ == "__main__":
     df = df[df["language"].isin(args.languages)]
     df = df[["text", "language", "source"]]
     for row in df.itertuples():
-        falcon.paraphrase(row.text, row.language)
+        aya.paraphrase(row.text, row.language)
         # falcon.keywords(long_words(row.text), row.language)
