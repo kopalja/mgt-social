@@ -75,7 +75,7 @@ if __name__ == "__main__":
     parser.add_argument("--use_gpu", default=False, action=argparse.BooleanOptionalAction)
     args = parser.parse_args()
     
-    falcon = Aya(args.model_path, use_gpu=args.use_gpu, debug=True)
+    aya = Aya(args.model_path, use_gpu=args.use_gpu, debug=True)
     df = pd.read_csv(args.data)
     df = df[df["language"].isin(args.languages)]
     df = df[["text", "language", "source"]]
