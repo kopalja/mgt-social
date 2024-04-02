@@ -33,7 +33,7 @@ class Aya:
                 print(f"############## Response ##############\n{response}")
             return response[len(inpt):]
         except Exception as e:
-            self.logger.error(f"Exception during Falcon inference: {e}")
+            self.logger.error(f"Exception during Aya inference: {e}")
             return f"Exception during inference {e}"
 
     def paraphrase(self, text: str, language: str, iterations: int = 3):
