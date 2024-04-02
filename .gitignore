@@ -4,3 +4,4 @@ output/*
 __pycache__
 job.log
 logs/*.log
+.cache/*

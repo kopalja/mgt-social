@@ -18,7 +18,7 @@ class Aya:
         self.debug = debug
         self.device = torch.device("cuda:0" if torch.cuda.is_available() and use_gpu else "cpu")
         self.tokenizer = AutoTokenizer.from_pretrained(model_name, cache_dir=cache_dir)
-        self.model = AutoModelForSeq2SeqLM.from_pretrained(model_name, cache_dir=cache_dir)
+        self.model = AutoModelForSeq2SeqLM.from_pretrained(model_name, load_in_4bit=True, cache_dir=cache_dir)
         self.logger = get_logger("models")
         
     def query(self, inpt: str) -> str:

@@ -4,12 +4,13 @@ from enum import Enum
 
 import pandas as pd
 
-from vicuna import Vicuna
-from mistral import Mistral
-from gemini import Gemini
-from eagle import Eagle
-from opt import Opt
-from aya import Aya
+from models.vicuna import Vicuna
+from models.mistral import Mistral
+from models.gemini import Gemini
+from models.eagle import Eagle
+from models.opt import Opt
+from models.falcon import Falcon
+from models.aya import Aya
 from spacy_tagging import spacy_keywords, long_words
 from summarizer import Summarizer
 
