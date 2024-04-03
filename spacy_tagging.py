@@ -4,13 +4,15 @@ from typing import List
 
 import spacy
 
+
 def long_words(text: str, words_to_return: int = 2) -> List[str]:
-    text = re.sub(r'[^a-zA-Z\s]', '', text)
+    text = re.sub(r"[^a-zA-Z\s]", "", text)
     words = list(set(text.split()))
     words = list(filter(lambda w: (not "http" in w), words))
-    words.sort(key = lambda w: -1 * len(w))
-    words.extend(["random" for _ in range(2 - len(words))]) # Make sure list has at least two items
+    words.sort(key=lambda w: -1 * len(w))
+    words.extend(["random" for _ in range(2 - len(words))])  # Make sure list has at least two items
     return words[:words_to_return]
+
 
 def spacy_keywords(text: str, lang: str, sample_size: int = 2) -> List[str]:
     if lang == "en":
@@ -31,4 +33,4 @@ def spacy_keywords(text: str, lang: str, sample_size: int = 2) -> List[str]:
 
 
 if __name__ == "__main__":
-    print(long_words("Hello my na is Jon and I live in Uk.")) # ['Hello', 'live']
+    print(long_words("Hello my na is Jon and I live in Uk."))  # ['Hello', 'live']
