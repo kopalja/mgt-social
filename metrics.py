@@ -108,6 +108,7 @@ def get_diff_charlen(dataset):
 def compute_stats_for_model(path: str):
     df = pd.read_csv(path)
     df["model_name"] = [path.split("/")[-1][:-4]] * len(df)
+    df['output'] = df['output'].fillna('')
 
     # if args.recompute:
     #     df['output'] = df['output'].apply(remove_bad_chars)
@@ -198,13 +199,10 @@ def analyzer2(df):
     temp2.to_html(os.path.join(args.output, "lang_check.html"), table_conversion="matplotlib")
 
     metrics = ["mauve", "meteor", "bertscore", "ngram", "ED-norm", "diff_charlen", "LangCheck"]
-    x = (
-        df.groupby(["model_name", "language"])[metrics]
-        .agg(["mean", "std"])
-        .style.format(na_rep=0, precision=4)
-        .highlight_max(props="font-weight: bold;", axis=0)
-    )
-    x.to_html(os.path.join(args.output, "all.html"))
+
+    df.groupby(["model_name", "language"])[metrics].agg(["mean", "std"]).style.format(
+        na_rep=0, precision=4
+    ).highlight_max(props="font-weight: bold;", axis=0).to_html(os.path.join(args.output, "all.html"))
 
 
 if __name__ == "__main__":
@@ -225,6 +223,7 @@ if __name__ == "__main__":
         for root, _, files in os.walk(args.root):
             for file in files:
                 if file.endswith(".csv"):
+                    print(f"Processing: {os.path.join(root, file)}")
                     combined_df = pd.concat(
                         [combined_df, compute_stats_for_model(os.path.join(root, file))], ignore_index=True, copy=False
                     )

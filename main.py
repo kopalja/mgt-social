@@ -14,6 +14,8 @@ from models.vicuna import Vicuna
 from spacy_tagging import long_words, spacy_keywords
 from summarizer import Summarizer
 
+os.environ["CUDA_LAUNCH_BLOCKING"] = "1"
+
 
 class GenerationType(Enum):
     paraphrase = "paraphrase"

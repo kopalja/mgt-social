@@ -33,8 +33,9 @@ class Falcon:
                 print(f"############## Response ##############\n{response}")
             return response[len(inpt):]
         except Exception as e:
-            self.logger.error(f"Exception during Falcon inference: {e}")
-            return f"Exception during inference {e}"
+            msg = f"Exception during Falcone inference: {e}"
+            self.logger.error(msg)
+            return msg
 
     def paraphrase(self, text: str, language: str, iterations: int = 3):
         instruction = f"Your goal is to paraphrase text in {LANGUAGE_CODE_MAP[language]} using different words and sentence composition. Responde with only paraphrased text and nothing else. Text to paraphrase:"
