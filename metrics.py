@@ -108,7 +108,7 @@ def get_diff_charlen(dataset):
 def compute_stats_for_model(path: str):
     df = pd.read_csv(path)
     df["model_name"] = [path.split("/")[-1][:-4]] * len(df)
-    df['output'] = df['output'].fillna('')
+    df["output"] = df["output"].fillna("")
 
     # if args.recompute:
     #     df['output'] = df['output'].apply(remove_bad_chars)
@@ -168,37 +168,22 @@ def analyzer1(df, grop_by_key: str):
 
 
 def analyzer2(df):
-    temp = pd.DataFrame()
-    for model in df["model_name"].unique():
-        for lang in ["en", "pt", "de", "nl", "es", "ru", "pl", "ar", "bg", "ca", "uk", "pl", "ro"]:
-            dataset = df[(df["model_name"] == model) & (df["language"] == lang)]
-            if len(dataset) == 0:
-                continue
-            langcheck = len(dataset[dataset.language != dataset.fasttext]) / len(dataset)
-            temp = pd.concat(
-                [
-                    temp,
-                    pd.DataFrame(
-                        {"model": model, "lang": lang, "langcheck": langcheck, "bertscore": dataset.bertscore.mean()},
-                        index=[0],
-                    ),
-                ],
-                ignore_index=True,
-            )
-
-    temp2 = (
-        temp.pivot_table("langcheck", "model", "lang")
-        .style.apply(
-            lambda x: [
-                "background-color: orange" if v >= 0.8 else "background-color: yellow" if v >= 0.5 else "" for v in x
-            ],
-            axis=1,
-        )
-        .format(precision=1)
-    )
-    temp2.to_html(os.path.join(args.output, "lang_check.html"), table_conversion="matplotlib")
-
     metrics = ["mauve", "meteor", "bertscore", "ngram", "ED-norm", "diff_charlen", "LangCheck"]
+    for metric in metrics:
+        table_agg = pd.DataFrame()
+        for (model_name, language), group in df.groupby(["model_name", "language"]):
+            if len(group) == 0:
+                continue
+            # Langcheck for pair <model, language> have to be computed from scratch
+            if metric == "LangCheck":
+                value = len(group[group.language != group.fasttext]) / len(group)
+            else:
+                value = group[metric].mean()
+            model_lang = pd.DataFrame({"model": model_name, "lang": language, metric: value}, index=[0])
+            table_agg = pd.concat([table_agg, model_lang], ignore_index=True)
+        table_agg.pivot_table(metric, "model", "lang").style.background_gradient(axis=1).format(precision=1).to_html(
+            os.path.join(args.output, f"{metric}.html"), table_conversion="matplotlib"
+        )
 
     df.groupby(["model_name", "language"])[metrics].agg(["mean", "std"]).style.format(
         na_rep=0, precision=4
