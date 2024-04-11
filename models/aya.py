@@ -31,7 +31,7 @@ class Aya:
             if self.debug:
                 print(f"############## Prompt ##############\n{inpt}")
                 print(f"############## Response ##############\n{response}")
-            return response[len(inpt):]
+            return response
         except Exception as e:
             self.logger.error(f"Exception during Aya inference: {e}")
             return f"Exception during inference {e}"
