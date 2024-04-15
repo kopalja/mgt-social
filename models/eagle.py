@@ -76,12 +76,10 @@ class Eagle:
     def paraphrase(self, text: str, language: str, iterations: int = 3):
         for template in PROMPTS:
             for config in PARAMETERS:
-                prompt = template.format(language=LANGUAGE_CODE_MAP[language], text=text)
-                #instruction = f"Your goal is to paraphrase text in {LANGUAGE_CODE_MAP[language]} using different words and sentence composition. Respond with only paraphrased text and nothing else. Text to paraphrase:"
                 for _ in range(iterations):
-                    #prompt = f'{instruction} "{text}"'
-                    answer = self.query(prompt, MODEL_GENERATE_ARGS=config)
-        return answer
+                    prompt = template.format(language=LANGUAGE_CODE_MAP[language], text=text)
+                    text = self.query(prompt, MODEL_GENERATE_ARGS=config)
+        return text
         
         
     def similar_to_n(self, texts: List[str], language: str, k: int):
