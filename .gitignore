@@ -5,3 +5,4 @@ __pycache__
 job.log
 logs/*.log
 .cache/*
+model_finetuned/*
