@@ -6,3 +6,5 @@ job.log
 logs/*.log
 .cache/*
 model_finetuned/*
+aya_finetuning/models/*
+multisocial_human.csv
