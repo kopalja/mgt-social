@@ -7,7 +7,7 @@ import evaluate
 import torch
 from transformers import AutoTokenizer, AutoModel, TrainingArguments
 from datasets import Dataset
-from scipy.special import softmax
+from sklearn.metrics import accuracy_score
 
 
 from aya_finetuning.aya_encoder_trainer import AyaEncoderTrainer
@@ -21,6 +21,7 @@ if __name__ == "__main__":
     parser.add_argument('--base_model', default="CohereForAI/aya-101", type=str) # google/mt5-small 
     parser.add_argument('--model_path', default=f"{pathlib.Path(__file__).parent.resolve()}/models/merged", type=str)
     parser.add_argument("--demo_dataset", default=True, action=argparse.BooleanOptionalAction) # TODO
+    parser.add_argument("--batch_size", default=2, type=int)
     args = parser.parse_args()
 
     tokenizer = AutoTokenizer.from_pretrained(args.base_model)
@@ -28,13 +29,14 @@ if __name__ == "__main__":
     
     
     if args.demo_dataset:
-        tokenized_test_dataset, _ = get_demo_dataset(tokenizer)
+        data, _ = get_demo_dataset(tokenizer)
     else:
         df = pd.read_csv(args.data)
+        # TODO
         # test_dataset = Dataset.from_pandas(test_df)
     
     
-    trainer_args = TrainingArguments(output_dir="model_finetuned", per_device_train_batch_size=1, per_device_eval_batch_size=1)
+    trainer_args = TrainingArguments(output_dir="model_finetuned", per_device_train_batch_size=2, per_device_eval_batch_size=2)
 
     # create Trainer
     trainer = AyaEncoderTrainer(
@@ -43,17 +45,17 @@ if __name__ == "__main__":
         args=trainer_args,
     )
     # get logits from predictions and evaluate results using classification report
-    predictions = trainer.predict(tokenized_test_dataset)
-    print("==========================")
-    print(predictions)
-    exit()
-    prob_pred = softmax(predictions.predictions, axis=-1)
-    preds = np.argmax(predictions.predictions, axis=-1)
-    metric = evaluate.load("bstrai/classification_report")
-    results = metric.compute(predictions=preds, references=predictions.label_ids)
+
+    all_predictions = []
+    for i in range(0, len(data), args.batch_size):
+        batch = data[i : min(i + args.batch_size, len(data))]
+        all_predictions.extend(trainer.predict(data[i : min(i + args.batch_size, len(data))]))
+        print(trainer.predict(data[i : min(i + args.batch_size, len(data))]))
+        
+    loss = torch.nn.BCELoss()(torch.tensor(data['label']).to(torch.float32), torch.tensor(all_predictions).to(torch.float32))
+    print("Loss:", loss.numpy())
+    print("Accuracy:", accuracy_score(data['label'], [round(p) for p in all_predictions]))
     
-    # return dictionary of classification report
-    # return results, preds, prob_pred
 
 
 

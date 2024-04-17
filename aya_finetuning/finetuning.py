@@ -58,8 +58,8 @@ if __name__ == "__main__":
         logging_steps=100,
         gradient_checkpointing=True, # Opt to use less Gpu memory
         load_best_model_at_end=True, # Save best model
-        learning_rate = 2e-4, #2e-4
-        num_train_epochs=2)
+        learning_rate = 2e-3, #2e-4
+        num_train_epochs=80)
         
 
     model = AutoModel.from_pretrained(args.model_name, quantization_config = QUANTIZATION_CONFIG, num_labels=2)

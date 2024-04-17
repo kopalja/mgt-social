@@ -1,9 +1,10 @@
 import torch
 from transformers import Trainer
+from scipy.special import expit
 
 class AyaEncoderTrainer(Trainer):
 
-    encoder_only: bool = True
+    encoder_only: bool = True # TODO: encoder-decoder version does not work
     def compute_loss(self, model, inputs, return_outputs=False):
 
         if isinstance(model, torch.nn.DataParallel):
@@ -32,11 +33,6 @@ class AyaEncoderTrainer(Trainer):
         else:
             model = self.model
             
-        if self.encoder_only:
-            model_to_use = model.get_encoder()
-        else:
-            model_to_use = model
-        
+        model_to_use = model.get_encoder() if self.encoder_only else model
         outputs = model_to_use(data)
-        print(outputs.last_hidden_state[0])
-        return outputs.last_hidden_state[:, 0, 0]
+        return expit(outputs.last_hidden_state[:, 0, 0].cpu().detach().numpy()) # sigmoid function
