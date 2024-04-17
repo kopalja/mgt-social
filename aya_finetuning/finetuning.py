@@ -36,9 +36,9 @@ if __name__ == "__main__":
         tokenized_train, tokenized_valid = get_demo_dataset(tokenizer)
     else:
         df = pd.read_csv(args.data)
-        df = df[["text", "label"]]
-        train = df[:-(len(df)//10)]
-        valid = df[-(len(df)//10):]
+        df = df[["text", "label", "split"]]
+        train = df[df["split"] == "train"]
+        valid = df[df["split"] == "test"]
         train = Dataset.from_pandas(train, split='train')
         valid = Dataset.from_pandas(valid, split='validation')
         def tokenize_function(examples):
@@ -48,7 +48,7 @@ if __name__ == "__main__":
 
 
     training_args = TrainingArguments(
-        output_dir="model_finetuned",
+        output_dir=args.output_dir,
         report_to=None,
         evaluation_strategy = "steps",
         save_strategy="steps",
@@ -58,8 +58,8 @@ if __name__ == "__main__":
         logging_steps=100,
         gradient_checkpointing=True, # Opt to use less Gpu memory
         load_best_model_at_end=True, # Save best model
-        learning_rate = 2e-3, #2e-4
-        num_train_epochs=80)
+        learning_rate = 2e-4, #2e-4
+        num_train_epochs=2)
         
 
     model = AutoModel.from_pretrained(args.model_name, quantization_config = QUANTIZATION_CONFIG, num_labels=2)
@@ -95,5 +95,4 @@ if __name__ == "__main__":
     os.makedirs(merged_model_path, exist_ok=True)
     model_to_save.save_pretrained(merged_model_path)
     
-
 

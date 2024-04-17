@@ -13,4 +13,18 @@
 # ACTIVATE ANACONDA
 eval "$(conda shell.bash hook)"
 conda activate mgt-social
-./run_all.sh
+
+
+
+# Small model
+# python -m aya_finetuning.finetuning --model_name google/mt5-small --demo_dataset
+# python -m aya_finetuning.inference --base_model google/mt5-small
+
+
+
+
+python -m aya_finetuning.finetuning --data '/home/kopal/multitude.csv'
+# python -m aya_finetuning.finetuning  --demo_dataset
+# python -m aya_finetuning.inference 
+
+# ./run_all.sh
