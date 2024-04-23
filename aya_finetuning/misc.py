@@ -36,3 +36,14 @@ def get_demo_dataset(tokenizer, size: int = 100, label: int = 1, use_context_siz
     tokenized_valid = valid.map(tokenize_function, batched=True)
 
     return tokenized_train, tokenized_valid
+
+def get_demo_instruction_dataset(size: int = 90000):
+    def task():
+        result = []
+        for _ in range(size):
+            x = np.random.randint(0, 10)
+            y = np.random.randint(0, 10)
+            result.append({"prompt": f"ADDITION TASK: {x} + {y}", "completion": f"ADDITION OUTPUT: {x + y}"}) 
+        return result
+    
+    return task(), task() 

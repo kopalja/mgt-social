@@ -15,16 +15,33 @@ eval "$(conda shell.bash hook)"
 conda activate mgt-social
 
 
+### Binary classification fine-tuning
 
-# Small model
+# Demo model
 # python -m aya_finetuning.finetuning --model_name google/mt5-small --demo_dataset
 # python -m aya_finetuning.inference --base_model google/mt5-small
 
 
 
-
-python -m aya_finetuning.finetuning --data '/home/kopal/multitude.csv'
+# Finetuning
+# python -m aya_finetuning.finetuning --data '/home/kopal/multitude.csv'
 # python -m aya_finetuning.finetuning  --demo_dataset
 # python -m aya_finetuning.inference 
 
-# ./run_all.sh
+
+# Inference
+# python -m aya_finetuning.inference  --data /home/kopal/multitude.csv
+# python -m aya_finetuning.inference  --model_path aya_finetuning/models/merged --data /home/kopal/multitude.csv
+# python -m aya_finetuning.inference  --model_path aya_finetuning/models_backup/merged --data /home/kopal/multitude.csv
+# python -m aya_finetuning.inference --model_path aya_finetuning/best_binary_classification_model/merged  --data "/home/kopal/semeval_all_test.csv"
+# python -m aya_finetuning.inference --model_path aya_finetuning/best_binary_classification_model/merged  --data '/home/kopal/multitude.csv'
+
+
+
+
+### Instruction fine-tuning
+
+# Finetuning
+# python -m aya_finetuning.finetuning --model_name google/mt5-small --demo_dataset
+
+

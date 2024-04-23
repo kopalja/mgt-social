@@ -35,14 +35,19 @@ if __name__ == "__main__":
     if args.demo_dataset:
         tokenized_train, tokenized_valid = get_demo_dataset(tokenizer)
     else:
+        seed = 42
         df = pd.read_csv(args.data)
-        df = df[["text", "label", "split"]]
         train = df[df["split"] == "train"]
-        valid = df[df["split"] == "test"]
+        train_en = train[train.language == "en"].groupby(['multi_label']).apply(lambda x: x.sample(min(1000, len(x)), random_state = seed)).sample(frac=1., random_state = 0).reset_index(drop=True)
+        train_es = train[train.language == "es"]
+        train_ru = train[train.language == "ru"]
+        train = pd.concat([train_en, train_es, train_ru], ignore_index=True, copy=False).sample(frac=1., random_state = seed).reset_index(drop=True)
+        train = train[:-(len(train)//10)]
+        valid = train[-(len(train)//10):]
         train = Dataset.from_pandas(train, split='train')
         valid = Dataset.from_pandas(valid, split='validation')
         def tokenize_function(examples):
-            return tokenizer(examples["text"], padding="max_length", truncation=True, max_length=213)
+            return tokenizer(examples["text"], padding="max_length", truncation=True, max_length=tokenizer.max_model_input_sizes['t5-11b'])
         tokenized_train = train.map(tokenize_function, batched=True)
         tokenized_valid = valid.map(tokenize_function, batched=True)
 
@@ -52,14 +57,14 @@ if __name__ == "__main__":
         report_to=None,
         evaluation_strategy = "steps",
         save_strategy="steps",
-        per_device_train_batch_size=4,
+        per_device_train_batch_size=2,
         gradient_accumulation_steps=4,
         save_steps=100,
         logging_steps=100,
         gradient_checkpointing=True, # Opt to use less Gpu memory
         load_best_model_at_end=True, # Save best model
-        learning_rate = 2e-3, #2e-4
-        num_train_epochs=80)
+        learning_rate = 2e-4, #2e-4
+        num_train_epochs=2.5)
         
 
     model = AutoModel.from_pretrained(args.model_name, quantization_config = QUANTIZATION_CONFIG, num_labels=2)
