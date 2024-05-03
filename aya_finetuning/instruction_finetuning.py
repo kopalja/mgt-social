@@ -10,6 +10,9 @@ from torch.utils.data import Dataset, DataLoader
 import pytorch_lightning as pl
 from pytorch_lightning.loggers import TensorBoardLogger
 from pytorch_lightning.callbacks.early_stopping import EarlyStopping
+from pytorch_lightning.callbacks import DeviceStatsMonitor
+
+from sklearn.metrics import accuracy_score, roc_curve, auc, f1_score
 
 from transformers import (
     AdamW,
@@ -28,15 +31,55 @@ from peft import (
 from aya_finetuning.misc import QUANTIZATION_CONFIG
 
 os.environ["TOKENIZERS_PARALLELISM"] = "false"
+ 
+ 
+def auc_from_pred(targets, predictions):
+    fpr, tpr, _ = roc_curve(targets, predictions,  pos_label=1)
+    return auc(fpr, tpr)
 
 
+class MultitudeDataset(Dataset):
+    def __init__(self, data_path, tokenizer, train_split, max_length=None):
+        
+        self.inputs, self.targets = [], []
+        seed = 42
+        df = pd.read_csv(data_path)
+        train = df[df["split"] == "train"]
+        train_en = train[train.language == "en"].groupby(['multi_label']).apply(lambda x: x.sample(min(1000, len(x)), random_state = seed)).sample(frac=1., random_state = 0).reset_index(drop=True)
+        train_es = train[train.language == "es"]
+        train_ru = train[train.language == "ru"]
+        data = pd.concat([train_en, train_es, train_ru], ignore_index=True, copy=False).sample(frac=1., random_state = seed).reset_index(drop=True)
+        data = train[len(train)//10:] if train_split else train[:len(train)//10]
+        
+        if max_length is not None:
+            data = data[:max_length]
+
+        for x in data.itertuples():
+            self.inputs.append(tokenizer(
+                f"Classification TASK: {x.text}", max_length=512, padding="max_length", truncation=True, return_tensors="pt"
+            ))
+            self.targets.append(tokenizer(
+                f"Classification OUTPUT: {'human' if x.label == 0 else 'machine'}", max_length=6, padding="max_length", return_tensors="pt"
+            ))
+        
+
+    def __len__(self):
+        return len(self.inputs)
+
+    def __getitem__(self, index):
+        input_ids = self.inputs[index]["input_ids"].squeeze()
+        target_ids = self.targets[index]["input_ids"].squeeze()
+        input_mask = self.inputs[index]["attention_mask"].squeeze()
+        target_mask = self.targets[index]["attention_mask"].squeeze()
+        return {"input_ids": input_ids, "input_mask": input_mask, "target_ids": target_ids, "target_mask": target_mask}
+        
+        
 class DemoDataset(Dataset):
-    def __init__(self, tokenizer, size, max_len=15):
-        self.inputs = []
-        self.targets = []
+    def __init__(self, tokenizer, size, max_len=20):
+        self.inputs, self.targets = [], []
         for _ in range(size):
-            x = np.random.randint(0, 100)
-            y = np.random.randint(0, 100)
+            x = np.random.randint(0, 10)
+            y = np.random.randint(0, 10)
 
             self.inputs.append(tokenizer(
                 f"ADDITION TASK: {x} + {y}", max_length=max_len, pad_to_max_length=True, return_tensors="pt"
@@ -56,6 +99,13 @@ class DemoDataset(Dataset):
         return {"input_ids": input_ids, "input_mask": input_mask, "target_ids": target_ids, "target_mask": target_mask}
 
 
+class Stats:
+    def __init__(self):
+        self.loss = []
+        self.targets = []
+        self.predictions = []
+        
+
 class T5FineTuner(pl.LightningModule):
     def __init__(self, my_params):
         super(T5FineTuner, self).__init__()
@@ -65,12 +115,12 @@ class T5FineTuner(pl.LightningModule):
         model = prepare_model_for_kbit_training(model)
         self.model = get_peft_model(model, LoraConfig(task_type="SEQ_2_SEQ_LM"))
         self.tokenizer = AutoTokenizer.from_pretrained(my_params.model_path)
-        self._training_losses, self._validation_losses = [], []
+        
         self._best_validation_loss = sys.float_info.max
-
+        self._training_stats, self._validation_stats = Stats(), Stats()
 
     def forward(self, batch):
-        labels = batch["target_ids"]
+        labels = batch["target_ids"].clone()
         labels[labels[:, :] == self.tokenizer.pad_token_id] = -100
         return self.model(
             batch["input_ids"],
@@ -80,35 +130,33 @@ class T5FineTuner(pl.LightningModule):
 
     def training_step(self, batch, batch_idx):
         outputs = self.forward(batch)
-        self._training_losses.append(outputs.loss)
+        self._update_stats(self._training_stats, batch, outputs)
         self.lr_scheduler.step()
         return outputs.loss
-        # return {"loss": outputs.loss} # Loss applied by pytorch
 
     def on_train_epoch_end(self):
-        avg_train_loss = torch.stack(self._training_losses).mean()
-        self.log_dict({"train_loss": avg_train_loss, "lr": self.lr_scheduler.get_last_lr()[-1]})
-        self._training_losses = []
+        loss, auc_value, accuracy, f1 =  self._compute_stats(self._training_stats)
+        self._training_stats = Stats()
+        self.log_dict({"train_loss": loss, "AUC": auc_value, "ACC": accuracy, "f1": f1, "lr": self.lr_scheduler.get_last_lr()[-1]})
 
     def validation_step(self, batch, batch_idx):
         outputs = self.forward(batch)
+        self._update_stats(self._validation_stats, batch, outputs)
         # Input - Output, visual check
         if batch_idx == 0:
-            argmax = torch.argmax(outputs.logits, -1, keepdim=False)
             print("\nInput: ", self.tokenizer.batch_decode(batch["input_ids"])[0])
-            print("Output: ", self.tokenizer.batch_decode(argmax)[0])
-        self._validation_losses.append(outputs.loss)
+            print("Output: ", self._decode_logits(outputs.logits)[0])
 
     def on_validation_epoch_end(self):
-        validation_loss = torch.stack(self._validation_losses).mean()
-        self.log_dict({"validation_loss": torch.stack(self._validation_losses).mean()})
+        loss, auc_value, accuracy, f1 =  self._compute_stats(self._validation_stats)
+        self._validation_stats = Stats()
+        self.log_dict({"validation_loss": loss, "validation_AUC": auc_value, "validation_ACC": accuracy, "validation_f1": f1})
+        
         if self.current_epoch + 1 == self.my_params.num_train_epochs and self._best_validation_loss == sys.float_info.max:
             self._save_model()
-        elif validation_loss < self._best_validation_loss and self.current_epoch > 1 and self.current_epoch % self.my_params.model_save_period_epochs == 0:
-            self._best_validation_loss = validation_loss
+        elif loss < self._best_validation_loss and self.current_epoch > 1 and self.current_epoch % self.my_params.model_save_period_epochs == 0:
+            self._best_validation_loss = loss
             self._save_model()
-            
-        self._validation_losses = []
 
     def configure_optimizers(self):
         no_decay = ["bias", "LayerNorm.weight"]
@@ -123,18 +171,44 @@ class T5FineTuner(pl.LightningModule):
             },
         ]
         self.opt = AdamW(optimizer_grouped_parameters, lr=self.my_params.learning_rate, eps=self.my_params.adam_epsilon, weight_decay = self.my_params.weight_decay)
-        return [self.opt]
+        return self.opt
         
     def train_dataloader(self):
-        train_dataset = DemoDataset(tokenizer=self.tokenizer, size=1000)
+        if args.demo_dataset:
+            train_dataset = DemoDataset(tokenizer=self.tokenizer, size=100)
+        else:
+            train_dataset = MultitudeDataset(data_path=self.my_params.data_path, tokenizer=self.tokenizer, train_split=True, max_length=500)
+            
         dataloader = DataLoader(train_dataset, batch_size=self.my_params.train_batch_size, drop_last=True, shuffle=True, num_workers=4)
         t_total = self.my_params.num_train_epochs * len(dataloader.dataset) // self.my_params.train_batch_size
         self.lr_scheduler = get_linear_schedule_with_warmup(self.opt, num_warmup_steps=self.my_params.warmup_steps, num_training_steps=t_total)
         return dataloader
 
     def val_dataloader(self):
-        val_dataset = DemoDataset(tokenizer=self.tokenizer, size=60)
+        if args.demo_dataset:
+            val_dataset = DemoDataset(tokenizer=self.tokenizer, size=100)
+        else:
+            val_dataset = MultitudeDataset(data_path=self.my_params.data_path, tokenizer=self.tokenizer, train_split=False, max_length=100)
+            
         return DataLoader(val_dataset, batch_size=self.my_params.eval_batch_size, num_workers=4, shuffle=True)
+
+    def _update_stats(self, stats: Stats, batch, outputs):
+        stats.loss.append(outputs.loss.detach())
+        target_strings = self.tokenizer.batch_decode(batch["target_ids"])
+        output_strings = self._decode_logits(outputs.logits.detach())
+        stats.targets.extend(['human' in x for x in target_strings])
+        stats.predictions.extend(['human' in x for x in output_strings])
+        
+    def _compute_stats(self, stats: Stats):
+        loss = torch.stack(stats.loss).mean()
+        auc = auc_from_pred(stats.targets, stats.predictions)
+        accuracy = accuracy_score(stats.targets, stats.predictions)
+        f1 = f1_score(stats.targets, stats.predictions)
+        return loss, auc, accuracy, f1
+
+    def _decode_logits(self, logits):
+        argmax = torch.argmax(logits, -1, keepdim=False)
+        return self.tokenizer.batch_decode(argmax)
 
     def _save_model(self):
         print("### Saving model ###")
@@ -161,17 +235,22 @@ if __name__ == "__main__":
     args_dict = dict(
         output_dir="aya_finetuning/models/instruction",
         model_path="google/mt5-small", # CohereForAI/aya-101"
-        learning_rate=1e-2,
+        data_path="/home/kopal/multitude.csv",
+        train_max_size=1000,
+        valid_max_size=1000,
+        learning_rate=5e-3,
         weight_decay=0.0,
         adam_epsilon=1e-8,
         warmup_steps=0,
-        train_batch_size=8,
-        eval_batch_size=16,
+        train_batch_size=4,
+        eval_batch_size=4,
         model_save_period_epochs=10,
-        num_train_epochs=40,
-        gradient_accumulation_steps=2,
+        num_train_epochs=50,
+        gradient_accumulation_steps=4,
         fp_16=False,
         max_grad_norm=1.0,
+        log=True,
+        demo_dataset=True
     )
     args = argparse.Namespace(**args_dict)
 
@@ -180,8 +259,8 @@ if __name__ == "__main__":
         max_epochs=args.num_train_epochs,
         precision= 16 if args.fp_16 else 32,
         gradient_clip_val=args.max_grad_norm,
-        logger = TensorBoardLogger(save_dir="lightning_logs", name="T5"),
-        callbacks=[EarlyStopping(monitor="validation_loss", mode="min", patience=10)]
+        logger = TensorBoardLogger(save_dir="lightning_logs", name="T5") if args.log else None,
+        callbacks=[EarlyStopping(monitor="validation_loss", mode="min", patience=10), DeviceStatsMonitor()]
         # log_every_n_steps = 10 # default is 50
     )
 
