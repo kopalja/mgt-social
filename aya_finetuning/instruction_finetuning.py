@@ -115,7 +115,6 @@ class T5FineTuner(pl.LightningModule):
         model = prepare_model_for_kbit_training(model)
         self.model = get_peft_model(model, LoraConfig(task_type="SEQ_2_SEQ_LM"))
         self.tokenizer = AutoTokenizer.from_pretrained(my_params.model_path)
-        
         self._best_validation_loss = sys.float_info.max
         self._training_stats, self._validation_stats = Stats(), Stats()
 
@@ -236,8 +235,6 @@ if __name__ == "__main__":
         output_dir="aya_finetuning/models/instruction",
         model_path="google/mt5-small", # CohereForAI/aya-101"
         data_path="/home/kopal/multitude.csv",
-        train_max_size=1000,
-        valid_max_size=1000,
         learning_rate=5e-3,
         weight_decay=0.0,
         adam_epsilon=1e-8,
