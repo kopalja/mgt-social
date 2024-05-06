@@ -176,7 +176,7 @@ class T5FineTuner(pl.LightningModule):
         if args.demo_dataset:
             train_dataset = DemoDataset(tokenizer=self.tokenizer, size=100)
         else:
-            train_dataset = MultitudeDataset(data_path=self.my_params.data_path, tokenizer=self.tokenizer, train_split=True, max_length=500)
+            train_dataset = MultitudeDataset(data_path=self.my_params.data_path, tokenizer=self.tokenizer, train_split=True)
             
         dataloader = DataLoader(train_dataset, batch_size=self.my_params.train_batch_size, drop_last=True, shuffle=True, num_workers=4)
         t_total = self.my_params.num_train_epochs * len(dataloader.dataset) // self.my_params.train_batch_size
@@ -187,7 +187,7 @@ class T5FineTuner(pl.LightningModule):
         if args.demo_dataset:
             val_dataset = DemoDataset(tokenizer=self.tokenizer, size=100)
         else:
-            val_dataset = MultitudeDataset(data_path=self.my_params.data_path, tokenizer=self.tokenizer, train_split=False, max_length=100)
+            val_dataset = MultitudeDataset(data_path=self.my_params.data_path, tokenizer=self.tokenizer, train_split=False)
             
         return DataLoader(val_dataset, batch_size=self.my_params.eval_batch_size, num_workers=4, shuffle=True)
 
@@ -233,21 +233,22 @@ if __name__ == "__main__":
 
     args_dict = dict(
         output_dir="aya_finetuning/models/instruction",
-        model_path="google/mt5-small", # CohereForAI/aya-101"
+        # model_path="google/mt5-small", # CohereForAI/aya-101"
+        model_path="CohereForAI/aya-101",
         data_path="/home/kopal/multitude.csv",
         learning_rate=5e-3,
         weight_decay=0.0,
         adam_epsilon=1e-8,
         warmup_steps=0,
-        train_batch_size=4,
-        eval_batch_size=4,
-        model_save_period_epochs=10,
+        train_batch_size=2,
+        eval_batch_size=2,
+        model_save_period_epochs=1,
         num_train_epochs=50,
         gradient_accumulation_steps=4,
         fp_16=False,
         max_grad_norm=1.0,
         log=True,
-        demo_dataset=True
+        demo_dataset=False
     )
     args = argparse.Namespace(**args_dict)
 
