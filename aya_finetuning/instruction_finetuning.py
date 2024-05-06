@@ -39,7 +39,7 @@ def auc_from_pred(targets, predictions):
 
 
 class MultitudeDataset(Dataset):
-    def __init__(self, data_path, tokenizer, train_split, max_length=None):
+    def __init__(self, data_path, tokenizer, train_split, max_length=None, balance: bool = False):
         
         self.inputs, self.targets = [], []
         seed = 42
@@ -48,7 +48,11 @@ class MultitudeDataset(Dataset):
         train_en = train[train.language == "en"].groupby(['multi_label']).apply(lambda x: x.sample(min(1000, len(x)), random_state = seed)).sample(frac=1., random_state = 0).reset_index(drop=True)
         train_es = train[train.language == "es"]
         train_ru = train[train.language == "ru"]
-        data = pd.concat([train_en, train_es, train_ru], ignore_index=True, copy=False).sample(frac=1., random_state = seed).reset_index(drop=True)
+        train = pd.concat([train_en, train_es, train_ru], ignore_index=True, copy=False).sample(frac=1., random_state = seed).reset_index(drop=True)
+        
+        if (balance):
+            train = train.groupby(['label']).apply(lambda x: x.sample(train.label.value_counts().max(), replace=True, random_state = seed)).sample(frac=1., random_state = seed).reset_index(drop=True)
+        
         data = train[len(train)//10:] if train_split else train[:len(train)//10]
         
         if max_length is not None:
@@ -58,9 +62,7 @@ class MultitudeDataset(Dataset):
             self.inputs.append(tokenizer(
                 f"Classification TASK: {x.text}", max_length=512, padding="max_length", truncation=True, return_tensors="pt"
             ))
-            self.targets.append(tokenizer(
-                f"Classification OUTPUT: {'human' if x.label == 0 else 'machine'}", max_length=6, padding="max_length", return_tensors="pt"
-            ))
+            self.targets.append(tokenizer(str(x.label), max_length=1, padding="max_length", return_tensors="pt"))
         
 
     def __len__(self):
@@ -131,6 +133,9 @@ class T5FineTuner(pl.LightningModule):
         outputs = self.forward(batch)
         self._update_stats(self._training_stats, batch, outputs)
         self.lr_scheduler.step()
+        if (batch_idx % 100 == 0):
+            loss, auc_value, accuracy, f1 =  self._compute_stats(self._training_stats)
+            self.log_dict({"train_loss": loss, "AUC": auc_value, "ACC": accuracy, "f1": f1, "lr": self.lr_scheduler.get_last_lr()[-1]})
         return outputs.loss
 
     def on_train_epoch_end(self):
@@ -176,7 +181,7 @@ class T5FineTuner(pl.LightningModule):
         if args.demo_dataset:
             train_dataset = DemoDataset(tokenizer=self.tokenizer, size=100)
         else:
-            train_dataset = MultitudeDataset(data_path=self.my_params.data_path, tokenizer=self.tokenizer, train_split=True)
+            train_dataset = MultitudeDataset(data_path=self.my_params.data_path, tokenizer=self.tokenizer, train_split=True, balance=True)
             
         dataloader = DataLoader(train_dataset, batch_size=self.my_params.train_batch_size, drop_last=True, shuffle=True, num_workers=4)
         t_total = self.my_params.num_train_epochs * len(dataloader.dataset) // self.my_params.train_batch_size
@@ -195,8 +200,8 @@ class T5FineTuner(pl.LightningModule):
         stats.loss.append(outputs.loss.detach())
         target_strings = self.tokenizer.batch_decode(batch["target_ids"])
         output_strings = self._decode_logits(outputs.logits.detach())
-        stats.targets.extend(['human' in x for x in target_strings])
-        stats.predictions.extend(['human' in x for x in output_strings])
+        stats.targets.extend(['0' in x for x in target_strings])
+        stats.predictions.extend(['0' in x for x in output_strings])
         
     def _compute_stats(self, stats: Stats):
         loss = torch.stack(stats.loss).mean()
@@ -236,14 +241,14 @@ if __name__ == "__main__":
         # model_path="google/mt5-small", # CohereForAI/aya-101"
         model_path="CohereForAI/aya-101",
         data_path="/home/kopal/multitude.csv",
-        learning_rate=5e-3,
+        learning_rate=5e-4,
         weight_decay=0.0,
         adam_epsilon=1e-8,
         warmup_steps=0,
         train_batch_size=2,
         eval_batch_size=2,
         model_save_period_epochs=1,
-        num_train_epochs=50,
+        num_train_epochs=5,
         gradient_accumulation_steps=4,
         fp_16=False,
         max_grad_norm=1.0,
