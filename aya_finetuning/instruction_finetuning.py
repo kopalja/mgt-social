@@ -44,16 +44,21 @@ class MultitudeDataset(Dataset):
         self.inputs, self.targets = [], []
         seed = 42
         df = pd.read_csv(data_path)
-        train = df[df["split"] == "train"]
-        train_en = train[train.language == "en"].groupby(['multi_label']).apply(lambda x: x.sample(min(1000, len(x)), random_state = seed)).sample(frac=1., random_state = 0).reset_index(drop=True)
-        train_es = train[train.language == "es"]
-        train_ru = train[train.language == "ru"]
-        train = pd.concat([train_en, train_es, train_ru], ignore_index=True, copy=False).sample(frac=1., random_state = seed).reset_index(drop=True)
+        if train_split:
+            train = df[df["split"] == "train"]
+            train_en = train[train.language == "en"].groupby(['multi_label']).apply(lambda x: x.sample(min(1000, len(x)), random_state = seed)).sample(frac=1., random_state = 0).reset_index(drop=True)
+            train_es = train[train.language == "es"]
+            train_ru = train[train.language == "ru"]
+            train = pd.concat([train_en, train_es, train_ru], ignore_index=True, copy=False).sample(frac=1., random_state = seed).reset_index(drop=True)
+            
+            if (balance):
+                train = train.groupby(['label']).apply(lambda x: x.sample(train.label.value_counts().max(), replace=True, random_state = seed)).sample(frac=1., random_state = seed).reset_index(drop=True)
+            # data = train[len(train)//10:] if train_split else train[:len(train)//10]
+            data = train[len(train)//10:]
+        else:
+            data = df[df["split"] == "test"]
+
         
-        if (balance):
-            train = train.groupby(['label']).apply(lambda x: x.sample(train.label.value_counts().max(), replace=True, random_state = seed)).sample(frac=1., random_state = seed).reset_index(drop=True)
-        
-        data = train[len(train)//10:] if train_split else train[:len(train)//10]
         
         if max_length is not None:
             data = data[:max_length]
@@ -119,6 +124,7 @@ class T5FineTuner(pl.LightningModule):
         self.tokenizer = AutoTokenizer.from_pretrained(my_params.model_path)
         self._best_validation_loss = sys.float_info.max
         self._training_stats, self._validation_stats = Stats(), Stats()
+        self._first_validation_finished = False
 
     def forward(self, batch):
         labels = batch["target_ids"].clone()
@@ -149,16 +155,22 @@ class T5FineTuner(pl.LightningModule):
         # Input - Output, visual check
         if batch_idx == 0:
             print("\nInput: ", self.tokenizer.batch_decode(batch["input_ids"])[0])
+            print("Target: ", self.tokenizer.batch_decode(batch["target_ids"])[0])
             print("Output: ", self._decode_logits(outputs.logits)[0])
 
     def on_validation_epoch_end(self):
+        if self._first_validation_finished == False:
+            self._first_validation_finished = True
+            self._validation_stats = Stats()
+            return
+            
         loss, auc_value, accuracy, f1 =  self._compute_stats(self._validation_stats)
         self._validation_stats = Stats()
         self.log_dict({"validation_loss": loss, "validation_AUC": auc_value, "validation_ACC": accuracy, "validation_f1": f1})
         
         if self.current_epoch + 1 == self.my_params.num_train_epochs and self._best_validation_loss == sys.float_info.max:
             self._save_model()
-        elif loss < self._best_validation_loss and self.current_epoch > 1 and self.current_epoch % self.my_params.model_save_period_epochs == 0:
+        elif loss < self._best_validation_loss and self.current_epoch % self.my_params.model_save_period_epochs == 0:
             self._best_validation_loss = loss
             self._save_model()
 
@@ -221,7 +233,7 @@ class T5FineTuner(pl.LightningModule):
         os.makedirs(best_model_path, exist_ok=True)
 
         self.model.save_pretrained(best_model_path)
-        # tokenizer.save_pretrained(best_model_path)
+        self.tokenizer.save_pretrained(best_model_path)
 
         # 2) Merge best and base models
         base_model = T5ForConditionalGeneration.from_pretrained(self.my_params.model_path)
@@ -248,7 +260,7 @@ if __name__ == "__main__":
         train_batch_size=2,
         eval_batch_size=2,
         model_save_period_epochs=1,
-        num_train_epochs=5,
+        num_train_epochs=2,
         gradient_accumulation_steps=4,
         fp_16=False,
         max_grad_norm=1.0,
@@ -270,13 +282,6 @@ if __name__ == "__main__":
     model = T5FineTuner(args)
     trainer = pl.Trainer(**train_params)
     trainer.fit(model)
-
-
-
-
-
-
-
 
 
 

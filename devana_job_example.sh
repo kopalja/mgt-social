@@ -43,5 +43,5 @@ conda activate mgt-social
 
 # Finetuning
 # python -m aya_finetuning.finetuning --model_name google/mt5-small --demo_dataset
-
+python -m aya_finetuning.instruction_finetuning
 
