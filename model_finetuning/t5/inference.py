@@ -6,7 +6,7 @@ import pandas as pd
 import evaluate
 import torch
 from transformers import AutoTokenizer, AutoModel, TrainingArguments
-from datasets import Dataset
+from model_finetuning.custom_datasets import Dataset
 from sklearn.metrics import accuracy_score, roc_curve, auc, f1_score
 
 from peft import (
@@ -14,8 +14,8 @@ from peft import (
     get_peft_model,
 )
 
-from aya_finetuning.aya_encoder_trainer import AyaEncoderTrainer
-from aya_finetuning.misc import QUANTIZATION_CONFIG, get_demo_dataset
+from aya_encoder_trainer import AyaEncoderTrainer
+from misc import QUANTIZATION_CONFIG, get_demo_dataset
 
 
 def auc_from_pred(targets, predictions):

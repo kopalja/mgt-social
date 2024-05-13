@@ -1,7 +1,6 @@
 import torch
 from transformers import Trainer
 from scipy.special import expit
-from trl import SFTTrainer
 
 class AyaEncoderTrainer(Trainer):
     encoder_only: bool = True # TODO: encoder-decoder version does not work
@@ -37,9 +36,3 @@ class AyaEncoderTrainer(Trainer):
         outputs = model_to_use(data)
         return expit(outputs.last_hidden_state[:, 0, 0].cpu().detach().numpy()) # sigmoid function
         
-        
-# TODO: Not working for instruction fine-tuning
-class AyaInstructionTrainer(SFTTrainer):
-    def compute_loss(self, model, inputs):
-        inputs["decoder_input_ids"] = inputs["input_ids"]
-        return super().compute_loss(model, inputs)

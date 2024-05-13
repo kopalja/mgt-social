@@ -6,9 +6,6 @@ job.log
 logs/*.log
 .cache/*
 model_finetuned/*
-aya_finetuning/models/*
-aya_finetuning/models_backup/*
-aya_finetuning/best_binary_classification_model/*
-aya_finetuning/models_working_demo/*
+model_finetuning/t5/models/*
 multisocial_human.csv
 lightning_logs/*

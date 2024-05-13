@@ -2,11 +2,8 @@ import argparse
 import pandas as pd
 import pathlib
 import os
-import torch
-from datasets import Dataset
-from transformers import AutoTokenizer, T5ForConditionalGeneration, TrainingArguments, Trainer, EarlyStoppingCallback
-import torch.nn.functional as F
-from datasets import load_dataset
+from custom_datasets import Dataset
+from transformers import AutoTokenizer, AutoModel, TrainingArguments, EarlyStoppingCallback
 
 from peft import (
     prepare_model_for_kbit_training,
@@ -14,17 +11,13 @@ from peft import (
     get_peft_model,
     PeftModel,
 )
-from trl import SFTTrainer, DataCollatorForCompletionOnlyLM
-
-
-
-from aya_finetuning.misc import QUANTIZATION_CONFIG, get_demo_dataset
+from t5.aya_encoder_trainer import AyaEncoderTrainer
+from misc import QUANTIZATION_CONFIG, get_demo_dataset
 
 os.environ["WANDB_DISABLED"] = "true"
 
 
 
-# TODO
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument('--data', type=str)
@@ -34,7 +27,6 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     os.makedirs(args.output_dir, exist_ok=True)
-
 
     tokenizer = AutoTokenizer.from_pretrained(args.model_name)
     
@@ -50,24 +42,12 @@ if __name__ == "__main__":
         train = pd.concat([train_en, train_es, train_ru], ignore_index=True, copy=False).sample(frac=1., random_state = seed).reset_index(drop=True)
         train = train[:-(len(train)//10)]
         valid = train[-(len(train)//10):]
-
-
-        dataset = []
-        for row  in train.itertuples():
-            dataset.append({'instruction': row.text, 'output': str(row.label)})
-        # train = dataset
-        dataset = Dataset.from_list(dataset)
-        print(type(dataset))
-
-        
-        
-        # train = Dataset.from_pandas(train, split='train')
-        # valid = Dataset.from_pandas(valid, split='validation')
-        # def tokenize_function(examples):
-        #     # return tokenizer(examples["text"], padding="max_length", truncation=True, max_length=tokenizer.max_model_input_sizes['t5-11b'])
-        #     return tokenizer(examples["text"], padding="max_length", truncation=True, max_length=512)
-        # tokenized_train = train.map(tokenize_function, batched=True)
-        # tokenized_valid = valid.map(tokenize_function, batched=True)
+        train = Dataset.from_pandas(train, split='train')
+        valid = Dataset.from_pandas(valid, split='validation')
+        def tokenize_function(examples):
+            return tokenizer(examples["text"], padding="max_length", truncation=True, max_length=tokenizer.max_model_input_sizes['t5-11b'])
+        tokenized_train = train.map(tokenize_function, batched=True)
+        tokenized_valid = valid.map(tokenize_function, batched=True)
 
 
     training_args = TrainingArguments(
@@ -85,32 +65,17 @@ if __name__ == "__main__":
         num_train_epochs=2.5)
         
 
-    # model = AutoModel.from_pretrained(args.model_name, quantization_config = QUANTIZATION_CONFIG, num_labels=2)
-    # model = prepare_model_for_kbit_training(model)
-    # model = get_peft_model(model, LoraConfig(task_type="SEQ_CLS"))
-    
-    model = T5ForConditionalGeneration.from_pretrained(args.model_name, quantization_config = QUANTIZATION_CONFIG)
+    model = AutoModel.from_pretrained(args.model_name, quantization_config = QUANTIZATION_CONFIG, num_labels=2)
     model = prepare_model_for_kbit_training(model)
-    model = get_peft_model(model, LoraConfig(task_type="SEQ_2_SEQ_LM"))
-    
-    
-    def formatting_prompts_func(example):
-        output_texts = []
-        for i in range(len(example['instruction'])):
-            text = f"### Question: {example['instruction'][i]}\n ### Answer: {example['output'][i]}"
-            output_texts.append(text)
-        return output_texts
-        
-    response_template = " ### Answer:"
-    collator = DataCollatorForCompletionOnlyLM(response_template, tokenizer=tokenizer)
+    model = get_peft_model(model, LoraConfig(task_type="SEQ_CLS"))
 
 
-    trainer = SFTTrainer(
+    trainer = AyaEncoderTrainer(
         model=model,
         args=training_args,
-        train_dataset=dataset,
-        formatting_func=formatting_prompts_func,
-        data_collator=collator,
+        train_dataset=tokenized_train,
+        eval_dataset=tokenized_valid,
+        callbacks = [EarlyStoppingCallback(early_stopping_patience=5)],
     )
     trainer.train()
 
@@ -124,7 +89,7 @@ if __name__ == "__main__":
     tokenizer.save_pretrained(best_model_path)
     
     
-    base_model = T5ForConditionalGeneration.from_pretrained(args.model_name, num_labels=2)
+    base_model = AutoModel.from_pretrained(args.model_name, num_labels=2)
     model_to_save = PeftModel.from_pretrained(base_model, best_model_path)
     model_to_save = model_to_save.merge_and_unload()
     
