@@ -47,25 +47,37 @@ class MultitudeDataset(Dataset):
         
         
 class DemoDataset(Dataset):
-    def __init__(self, tokenizer, size, max_len=20):
+    def __init__(self, tokenizer, is_instruction: bool, size: int, max_input_token: int = 20):
+        self._is_instruction = is_instruction
         self.inputs, self.targets = [], []
         for _ in range(size):
             x = np.random.randint(0, 10)
             y = np.random.randint(0, 10)
 
             self.inputs.append(tokenizer(
-                f"ADDITION TASK: {x} + {y}", max_length=max_len, pad_to_max_length=True, return_tensors="pt"
+                f"ADDITION TASK: {x} + {y}", max_length=max_input_token, pad_to_max_length=True, return_tensors="pt"
             ))
-            self.targets.append(tokenizer(
-                f"ADDITION OUTPUT: {x + y}", max_length=max_len, pad_to_max_length=True, return_tensors="pt"
-            ))
+
+            if is_instruction:
+                self.targets.append(tokenizer(
+                    f"ADDITION OUTPUT: {x + y}", max_length=max_input_token, pad_to_max_length=True, return_tensors="pt"
+                ))
+            else:
+                self.targets.append((x + y) % 2)
             
     def __len__(self):
         return len(self.inputs)
 
     def __getitem__(self, index):
         input_ids = self.inputs[index]["input_ids"].squeeze()
-        target_ids = self.targets[index]["input_ids"].squeeze()
         input_mask = self.inputs[index]["attention_mask"].squeeze()
-        target_mask = self.targets[index]["attention_mask"].squeeze()
-        return {"input_ids": input_ids, "input_mask": input_mask, "target_ids": target_ids, "target_mask": target_mask}
+        
+        if self._is_instruction:
+            target_ids = self.targets[index]["input_ids"].squeeze()
+            target_mask = self.targets[index]["attention_mask"].squeeze()
+            return {"input_ids": input_ids, "input_mask": input_mask, "target_ids": target_ids, "target_mask": target_mask}
+        else:
+            return {"input_ids": input_ids, "input_mask": input_mask, "target": self.targets[index]}
+            
+            
+            
