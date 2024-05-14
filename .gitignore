@@ -11,3 +11,5 @@ model_finetuning/mdberta/models/*
 multisocial_human.csv
 lightning_logs/*
 model_finetuning/lightning_logs/*
+model_finetuning/slurm_logs/*
+model_finetuning/saved_models/*
