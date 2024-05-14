@@ -21,14 +21,7 @@ from transformers import (
     get_linear_schedule_with_warmup,
 )
 
-from peft import (
-    prepare_model_for_kbit_training,
-    LoraConfig,
-    get_peft_model,
-    PeftModel
-)
-
-from misc import QUANTIZATION_CONFIG
+from custom_datasets import DemoDataset, MultitudeDataset, BalanceType
 
 os.environ["TOKENIZERS_PARALLELISM"] = "false"
  
@@ -37,71 +30,7 @@ def auc_from_pred(targets, predictions):
     fpr, tpr, _ = roc_curve(targets, predictions,  pos_label=1)
     return auc(fpr, tpr)
 
-
-class MultitudeDataset(Dataset):
-    def __init__(self, data_path, tokenizer, train_split, max_length=None, balance: bool = False):
         
-        self.inputs, self.targets = [], []
-        seed = 42
-        df = pd.read_csv(data_path)
-        if train_split:
-            train = df[df["split"] == "train"]
-            train_en = train[train.language == "en"].groupby(['multi_label']).apply(lambda x: x.sample(min(1000, len(x)), random_state = seed)).sample(frac=1., random_state = 0).reset_index(drop=True)
-            train_es = train[train.language == "es"]
-            train_ru = train[train.language == "ru"]
-            train = pd.concat([train_en, train_es, train_ru], ignore_index=True, copy=False).sample(frac=1., random_state = seed).reset_index(drop=True)
-            
-            if (balance):
-                train = train.groupby(['label']).apply(lambda x: x.sample(train.label.value_counts().max(), replace=True, random_state = seed)).sample(frac=1., random_state = seed).reset_index(drop=True)
-            # data = train[len(train)//10:] if train_split else train[:len(train)//10]
-            data = train[len(train)//10:]
-        else:
-            data = df[df["split"] == "test"]
-
-        
-        
-        if max_length is not None:
-            data = data[:max_length]
-
-        for x in data.itertuples():
-            self.inputs.append(tokenizer(
-                f"Classification TASK: {x.text}", max_length=512, padding="max_length", truncation=True, return_tensors="pt"
-            ))
-            self.targets.append(tokenizer(str(x.label), max_length=1, padding="max_length", return_tensors="pt"))
-        
-
-    def __len__(self):
-        return len(self.inputs)
-
-    def __getitem__(self, index):
-        input_ids = self.inputs[index]["input_ids"].squeeze()
-        target_ids = self.targets[index]["input_ids"].squeeze()
-        input_mask = self.inputs[index]["attention_mask"].squeeze()
-        target_mask = self.targets[index]["attention_mask"].squeeze()
-        return {"input_ids": input_ids, "input_mask": input_mask, "target_ids": target_ids, "target_mask": target_mask}
-        
-        
-class DemoDataset(Dataset):
-    def __init__(self, tokenizer, size, max_len=20):
-        self.inputs, self.targets = [], []
-        for _ in range(size):
-            x = np.random.randint(0, 10)
-            y = np.random.randint(0, 10)
-
-            self.inputs.append(tokenizer(
-                f"ADDITION TASK: {x} + {y}", max_length=max_len, pad_to_max_length=True, return_tensors="pt"
-            ))
-            self.targets.append((x + y) % 2)
-
-    def __len__(self):
-        return len(self.inputs)
-
-    def __getitem__(self, index):
-        input_ids = self.inputs[index]["input_ids"].squeeze()
-        input_mask = self.inputs[index]["attention_mask"].squeeze()
-        return {"input_ids": input_ids, "input_mask": input_mask, "target": self.targets[index]}
-
-
 class Stats:
     def __init__(self):
         self.loss = []
@@ -183,9 +112,10 @@ class MDebertaClassifier(pl.LightningModule):
         
     def train_dataloader(self):
         if args.demo_dataset:
-            train_dataset = DemoDataset(tokenizer=self.tokenizer, size=100)
+            train_dataset = DemoDataset(tokenizer=self.tokenizer, is_instruction=False, size=1000)
         else:
-            train_dataset = MultitudeDataset(data_path=self.my_params.data_path, tokenizer=self.tokenizer, train_split=True, balance=True)
+            # train_dataset = MultitudeDataset(data_path=self.my_params.data_path, tokenizer=self.tokenizer, is_instruction=False, train_split=True, balance=BalanceType.NON)
+            train_dataset = MultitudeDataset(data_path=self.my_params.data_path, tokenizer=self.tokenizer, is_instruction=False, train_split=True, balance=BalanceType.CUTMAJORITY)
             
         dataloader = DataLoader(train_dataset, batch_size=self.my_params.train_batch_size, drop_last=True, shuffle=True, num_workers=4)
         t_total = self.my_params.num_train_epochs * len(dataloader.dataset) // self.my_params.train_batch_size
@@ -194,9 +124,9 @@ class MDebertaClassifier(pl.LightningModule):
 
     def val_dataloader(self):
         if args.demo_dataset:
-            val_dataset = DemoDataset(tokenizer=self.tokenizer, size=100)
+            val_dataset = DemoDataset(tokenizer=self.tokenizer, is_instruction=False, size=200)
         else:
-            val_dataset = MultitudeDataset(data_path=self.my_params.data_path, tokenizer=self.tokenizer, train_split=False)
+            val_dataset = MultitudeDataset(data_path=self.my_params.data_path, tokenizer=self.tokenizer, is_instruction=False, train_split=False, balance=BalanceType.NON)
             
         return DataLoader(val_dataset, batch_size=self.my_params.eval_batch_size, num_workers=4, shuffle=True)
 
@@ -206,9 +136,6 @@ class MDebertaClassifier(pl.LightningModule):
         outputs = torch.argmax(logits, dim=-1)
         stats.targets.extend(batch["target"].cpu())
         stats.predictions.extend(outputs)
-        # print("Targets: ", batch["target"])
-        # print("Outputs Raw: ", logits)
-        # print("Outputs: ", torch.argmax(logits, dim=-1))
         
     def _compute_stats(self, stats: Stats):
         loss = torch.stack(stats.loss).mean()
@@ -229,39 +156,30 @@ class MDebertaClassifier(pl.LightningModule):
 
         self.model.save_pretrained(best_model_path)
         self.tokenizer.save_pretrained(best_model_path)
-        return
-
-        # 2) Merge best and base models
-        base_model = DebertaForSequenceClassification.from_pretrained(self.my_params.model_path, num_labels=2, ignore_mismatched_sizes=True)
-        merged_model = PeftModel.from_pretrained(base_model, best_model_path)
-        merged_model = merged_model.merge_and_unload()
-        merged_model_path = os.path.join(self.my_params.output_dir, "merged")
-        os.makedirs(merged_model_path, exist_ok=True)
-        merged_model.save_pretrained(merged_model_path)
 
 
 
 
 if __name__ == "__main__":
 
+    run_name = "mdberta_cut_majority"
     args_dict = dict(
-        output_dir="aya_finetuning/models/mdeberta",
-        # model_path="google/mt5-small", # CohereForAI/aya-101"
-        model_path="microsoft/deberta-v3-small",
+        output_dir=f"mdberta/models/{run_name}",
+        model_path="microsoft/mdeberta-v3-base",
         data_path="/home/kopal/multitude.csv",
-        learning_rate=5e-4,
+        learning_rate=1e-5,
         weight_decay=0.0,
         adam_epsilon=1e-8,
         warmup_steps=0,
         train_batch_size=6,
         eval_batch_size=6,
-        model_save_period_epochs=1,
-        num_train_epochs=2,
+        model_save_period_epochs=2,
+        num_train_epochs=100,
         gradient_accumulation_steps=4,
         fp_16=False,
         max_grad_norm=1.0,
         log=True,
-        demo_dataset=True
+        demo_dataset=False
     )
     args = argparse.Namespace(**args_dict)
 
@@ -270,7 +188,7 @@ if __name__ == "__main__":
         max_epochs=args.num_train_epochs,
         precision= 16 if args.fp_16 else 32,
         gradient_clip_val=args.max_grad_norm,
-        logger = TensorBoardLogger(save_dir="lightning_logs", name="Balancing") if args.log else None,
+        logger = TensorBoardLogger(save_dir="lightning_logs", name=run_name) if args.log else None,
         callbacks=[EarlyStopping(monitor="validation_loss", mode="min", patience=10), DeviceStatsMonitor()]
         # log_every_n_steps = 10 # default is 50
     )
@@ -278,6 +196,8 @@ if __name__ == "__main__":
     model = MDebertaClassifier(args)
     trainer = pl.Trainer(**train_params)
     trainer.fit(model)
+
+
 
 # mDeBERTA, xlm-roberta-large: full-finetuning 
 # Compare methods to balance dataset:
