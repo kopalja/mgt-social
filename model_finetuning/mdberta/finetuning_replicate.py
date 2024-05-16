@@ -8,15 +8,12 @@ from transformers.optimization import Adafactor, AdafactorSchedule
 import numpy as np
 from sklearn.metrics import accuracy_score, f1_score, mean_absolute_error, roc_curve, auc
 import torch
-import shutil
 import time
 
 RANDOM_SEED = 42
 np.random.seed(RANDOM_SEED)
 torch.manual_seed(RANDOM_SEED)
 torch.cuda.empty_cache()
-
-    
 tokenizer = AutoTokenizer.from_pretrained(PRE_TRAINED_MODEL_NAME)
 
 if tokenizer.pad_token is None:
@@ -123,8 +120,6 @@ trainer = Trainer(
 )
 trainer.train()
 
-# shutil.rmtree(output_model, ignore_errors=True)
-# trainer.save_model()
 
 
 

@@ -15,5 +15,10 @@ conda activate mgt-social
 
 
 echo "Running ${MODEL_TYPE}"
-python main.py --data_path "/home/kopal/multidomain_subset.csv" --model ${MODEL_TYPE} --domain social_media --language en es ru --generator gemini --hf_token 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  
+python main.py --data_path "/home/kopal/multidomain_subset.csv" \
+               --model ${MODEL_TYPE} \
+               --domain social_media \
+               --language en es ru \
+               --generator gemini \
+               --hf_token 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
 

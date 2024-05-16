@@ -1,4 +1,6 @@
 import argparse
+import pathlib
+import shutil
 import os
 import sys
 
@@ -17,9 +19,12 @@ from sklearn.metrics import accuracy_score, roc_curve, auc, f1_score
 from transformers import (
     AdamW,
     DebertaForSequenceClassification,
+    AutoModelForSequenceClassification,
     AutoTokenizer,
     get_linear_schedule_with_warmup,
 )
+
+from transformers.optimization import Adafactor, AdafactorSchedule
 
 from custom_datasets import DemoDataset, MultitudeDataset, BalanceType
 
@@ -37,13 +42,22 @@ class Stats:
         self.targets = []
         self.predictions = []
         
+class MyAdafactorSchedule(AdafactorSchedule):
+    def get_lr(self):
+        opt = self.optimizer
+        if "step" in opt.state[opt.param_groups[0]["params"][0]]:
+            lrs = [opt._get_lr(group, opt.state[p]) for group in opt.param_groups for p in group["params"]]
+        else:
+            learning_rate=2e-4
+            lrs = [learning_rate] #just to prevent error in some models (mdeberta), return fixed value according to set TrainingArguments
+        return lrs #[lrs]
 
 class MDebertaClassifier(pl.LightningModule):
     def __init__(self, my_params):
         super(MDebertaClassifier, self).__init__()
         self.my_params = my_params
 
-        self.model = DebertaForSequenceClassification.from_pretrained(my_params.model_path, num_labels=2, ignore_mismatched_sizes=True)
+        self.model = AutoModelForSequenceClassification.from_pretrained(my_params.model_path, num_labels=2, ignore_mismatched_sizes=True)
         self.tokenizer = AutoTokenizer.from_pretrained(my_params.model_path)
         if self.tokenizer.pad_token is None:
             if self.tokenizer.eos_token is not None:
@@ -121,7 +135,8 @@ class MDebertaClassifier(pl.LightningModule):
                 "weight_decay": 0.0,
             },
         ]
-        self.opt = AdamW(optimizer_grouped_parameters, lr=self.my_params.learning_rate, eps=self.my_params.adam_epsilon, weight_decay = self.my_params.weight_decay)
+        # self.opt = AdamW(optimizer_grouped_parameters, lr=self.my_params.learning_rate, eps=self.my_params.adam_epsilon, weight_decay = self.my_params.weight_decay)
+        self.opt = Adafactor(self.model.parameters(), scale_parameter=True, relative_step=True, warmup_init=True, lr=None)
         return self.opt
         
     def train_dataloader(self):
@@ -132,7 +147,8 @@ class MDebertaClassifier(pl.LightningModule):
             
         dataloader = DataLoader(train_dataset, batch_size=self.my_params.train_batch_size, drop_last=True, shuffle=True, num_workers=4)
         t_total = self.my_params.num_train_epochs * len(dataloader.dataset) // self.my_params.train_batch_size
-        self.lr_scheduler = get_linear_schedule_with_warmup(self.opt, num_warmup_steps=self.my_params.warmup_steps, num_training_steps=t_total)
+        # self.lr_scheduler = get_linear_schedule_with_warmup(self.opt, num_warmup_steps=self.my_params.warmup_steps, num_training_steps=t_total)
+        self.lr_scheduler = AdafactorSchedule(self.opt)
         return dataloader
 
     def val_dataloader(self):
@@ -176,7 +192,7 @@ class MDebertaClassifier(pl.LightningModule):
 
 if __name__ == "__main__":
 
-    run_name = "mdberta_no_balance_fix"
+    run_name = "mdberta_no_balance_replicate"
     args_dict = dict(
         output_dir=f"mdberta/models/{run_name}",
         model_path="microsoft/mdeberta-v3-base",
@@ -197,14 +213,19 @@ if __name__ == "__main__":
     )
     args = argparse.Namespace(**args_dict)
 
+    src = pathlib.Path(__file__).parent.resolve()
+    dst_root = "/home/kopal/mgt-social/model_finetuning/lightning_logs/mdberta_no_balance_replicate/"
+    version = len(os.listdir(dst_root)) - 1
+    shutil.copy(os.path.join(src, "finetuning.py"), os.path.join(dst_root, "scripts", f"finetuning_{version}.py"))
+
     train_params = dict(
         accumulate_grad_batches=args.gradient_accumulation_steps,
         max_epochs=args.num_train_epochs,
         precision= 16 if args.fp_16 else 32,
         gradient_clip_val=args.max_grad_norm,
-        val_check_interval=0.1,
+        # val_check_interval=0.1,
         logger = TensorBoardLogger(save_dir="lightning_logs", name=run_name) if args.log else None,
-        callbacks=[EarlyStopping(monitor="validation_loss", mode="min", patience=10), DeviceStatsMonitor()]
+        # callbacks=[EarlyStopping(monitor="validation_loss", mode="min", patience=10), DeviceStatsMonitor()]
         log_every_n_steps = 50 # default is 50
     )
 

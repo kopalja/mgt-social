@@ -21,6 +21,8 @@ from transformers import (
     get_linear_schedule_with_warmup,
 )
 
+from transformers.optimization import Adafactor, AdafactorSchedule
+
 from custom_datasets import DemoDataset, MultitudeDataset, BalanceType, MultidomaindeDataset
 
 os.environ["TOKENIZERS_PARALLELISM"] = "false"
@@ -38,14 +40,22 @@ class Stats:
         self.predictions = []
         
 
+class MyAdafactorSchedule(AdafactorSchedule):
+    def get_lr(self):
+        opt = self.optimizer
+        if "step" in opt.state[opt.param_groups[0]["params"][0]]:
+            lrs = [opt._get_lr(group, opt.state[p]) for group in opt.param_groups for p in group["params"]]
+        else:
+            learning_rate=2e-4
+            lrs = [learning_rate] #just to prevent error in some models (mdeberta), return fixed value according to set TrainingArguments
+        return lrs #[lrs]
+        
 class TrainerForSequenceClassification(pl.LightningModule):
     def __init__(self, my_params):
         super(TrainerForSequenceClassification, self).__init__()
         self.my_params = my_params
 
         self.model = my_params.model
-        
-        
         self.tokenizer = AutoTokenizer.from_pretrained(my_params.tokenizer_path)
         if self.tokenizer .pad_token is None:
             if self.tokenizer .eos_token is not None:
@@ -73,8 +83,9 @@ class TrainerForSequenceClassification(pl.LightningModule):
         outputs = self.forward(batch)
         self._update_stats(self._training_stats, batch, outputs)
         self.lr_scheduler.step()
-        if (batch_idx % 100 == 0):
+        if (batch_idx % 50 == 0):
             loss, auc_value, accuracy, f1 =  self._compute_stats(self._training_stats)
+            self._training_stats = Stats()
             self.log_dict({"train_loss": loss, "AUC": auc_value, "ACC": accuracy, "f1": f1, "lr": self.lr_scheduler.get_last_lr()[-1]})
         return outputs.loss
 
@@ -109,18 +120,19 @@ class TrainerForSequenceClassification(pl.LightningModule):
             self._save_model()
 
     def configure_optimizers(self):
-        no_decay = ["bias", "LayerNorm.weight"]
-        optimizer_grouped_parameters = [
-            {
-                "params": [p for n, p in self.model.named_parameters() if not any(nd in n for nd in no_decay)],
-                "weight_decay": self.my_params.weight_decay,
-            },
-            {
-                "params": [p for n, p in self.model.named_parameters() if any(nd in n for nd in no_decay)],
-                "weight_decay": 0.0,
-            },
-        ]
-        self.opt = AdamW(optimizer_grouped_parameters, lr=self.my_params.learning_rate, eps=self.my_params.adam_epsilon, weight_decay = self.my_params.weight_decay)
+        # no_decay = ["bias", "LayerNorm.weight"]
+        # optimizer_grouped_parameters = [
+        #     {
+        #         "params": [p for n, p in self.model.named_parameters() if not any(nd in n for nd in no_decay)],
+        #         "weight_decay": self.my_params.weight_decay,
+        #     },
+        #     {
+        #         "params": [p for n, p in self.model.named_parameters() if any(nd in n for nd in no_decay)],
+        #         "weight_decay": 0.0,
+        #     },
+        # ]
+        self.opt = Adafactor(self.model.parameters(), scale_parameter=True, relative_step=True, warmup_init=True, lr=None)
+        self.lr_scheduler = MyAdafactorSchedule(self.opt)
         return self.opt
         
     def train_dataloader(self):
@@ -130,8 +142,6 @@ class TrainerForSequenceClassification(pl.LightningModule):
             train_dataset = MultidomaindeDataset(df=self.my_params.data, tokenizer=self.tokenizer, is_instruction=False, train_split=True, balance=BalanceType.DUPLICATEMINORITY)
             
         dataloader = DataLoader(train_dataset, batch_size=self.my_params.train_batch_size, drop_last=True, shuffle=True, num_workers=4)
-        t_total = self.my_params.num_train_epochs * len(dataloader.dataset) // self.my_params.train_batch_size
-        self.lr_scheduler = get_linear_schedule_with_warmup(self.opt, num_warmup_steps=self.my_params.warmup_steps, num_training_steps=t_total)
         return dataloader
 
     def val_dataloader(self):

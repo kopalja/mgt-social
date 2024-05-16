@@ -13,3 +13,5 @@ lightning_logs/*
 model_finetuning/lightning_logs/*
 model_finetuning/slurm_logs/*
 model_finetuning/saved_models/*
+model_finetuning/tmp/*
+*.log
