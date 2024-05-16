@@ -6,13 +6,10 @@ model_name = PRE_TRAINED_MODEL_NAME.split('/')[-1]
 dataset = "all" # sys.argv[2] #'en', 'es', 'ru', 'all', 'en3'
 generative_model = "tmp" # sys.argv[3] #'text-davinci-003', 'gpt-3.5-turbo', 'gpt-4', 'llama-65b', 'opt-66b', 'opt-iml-max-1.3b', 'all'
 output_model = f'{MODELPATH}{model_name}-finetuned-{dataset}-{generative_model}'
-balance = False
-if balance:
-    output_model = f'{MODELPATH}{model_name}-finetuned-{dataset}-{generative_model}-balanced'
 
 
 import pandas as pd
-from datasets import Dataset, concatenate_datasets
+from datasets import Dataset
 from transformers import AutoTokenizer, AutoModelForSequenceClassification, TrainingArguments, Trainer, EarlyStoppingCallback
 from transformers.optimization import Adafactor, AdafactorSchedule
 import numpy as np
@@ -25,16 +22,8 @@ RANDOM_SEED = 42
 np.random.seed(RANDOM_SEED)
 torch.manual_seed(RANDOM_SEED)
 
-device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 torch.cuda.empty_cache()
 
-label_names = ["human", "machine"] #0, 1
-id2label = {idx:label for idx, label in enumerate(label_names)}
-label2id = {v:k for k,v in id2label.items()}
-
-def map_labels(example):
-  label_name = example["label"]
-  return {"label": label2id[label_name], "label_name": label_name}
     
 tokenizer = AutoTokenizer.from_pretrained(PRE_TRAINED_MODEL_NAME)
 
@@ -44,17 +33,14 @@ if tokenizer.pad_token is None:
   else:
     tokenizer.add_special_tokens({'pad_token': '[PAD]'})
 
-start = time.time()
-num_labels = len(label_names)
-model = AutoModelForSequenceClassification.from_pretrained(PRE_TRAINED_MODEL_NAME, num_labels=num_labels, label2id=label2id, id2label=id2label, ignore_mismatched_sizes=True)
+model = AutoModelForSequenceClassification.from_pretrained(PRE_TRAINED_MODEL_NAME, num_labels=2, ignore_mismatched_sizes=True)
 model.resize_token_embeddings(len(tokenizer))
+
 try:
   model.config.pad_token_id = tokenizer.get_vocab()[tokenizer.pad_token]
 except:
   print("Warning: Exception occured while setting pad_token_id")
 end = time.time()
-print(f'{model_name} loading took {(end - start)/60} min')
-print(f'{model_name} memory footprint {model.get_memory_footprint()/1024/1024/1024}')
 
 all_data = pd.read_csv(DATAPATH)
 train = all_data[all_data.split == "train"]
@@ -63,25 +49,12 @@ train_en = train[train.language == "en"].groupby(['multi_label']).apply(lambda x
 train_es = train[train.language == "es"]
 train_ru = train[train.language == "ru"]
 train = pd.concat([train_en, train_es, train_ru], ignore_index=True, copy=False).sample(frac=1., random_state = RANDOM_SEED).reset_index(drop=True)
-    
-train['label'] = ["human" if "human" in x else "machine" for x in train.multi_label]
-
-if(balance):
-  train = train.groupby(['label']).apply(lambda x: x.sample(train.label.value_counts().max(), replace=True, random_state = RANDOM_SEED)).sample(frac=1., random_state = RANDOM_SEED).reset_index(drop=True)
-
-# valid = train[-(len(train)//10):]
 valid = all_data[all_data.split == "test"]
-valid['label'] = ["human" if "human" in x else "machine" for x in valid.multi_label]
  
 train = train[:-(len(train)//10)]
 
-print(train.groupby('language')['multi_label'].value_counts())
-print(train.label.value_counts())
-
 train = Dataset.from_pandas(train, split='train')
 valid = Dataset.from_pandas(valid, split='validation')
-train = train.map(map_labels)
-valid = valid.map(map_labels)
 
 def tokenize_texts(examples):
   return tokenizer(examples["text"], truncation=True, max_length=512)
@@ -93,18 +66,8 @@ batch_size = 16
 gradient_accumulation_steps=4
 num_train_epochs = 10
 learning_rate=2e-4
-metric_for_best_model = 'MacroF1'
-logging_steps = len(tokenized_train) // (batch_size * num_train_epochs)
 logging_steps = round(2000 / (batch_size * gradient_accumulation_steps)) #eval around each 2000 samples
 
-
-if ("small" in model_name):
-    #logging_steps //= 3
-    logging_steps *= 5
-    #learning_rate=2e-8
-    metric_for_best_model = 'ACC'
-
-use_fp16 = False
 
 args = TrainingArguments(
     output_dir=output_model,
@@ -123,8 +86,7 @@ args = TrainingArguments(
     weight_decay=0.01,
     push_to_hub=False,
     report_to="none",
-    metric_for_best_model = metric_for_best_model,
-    fp16=use_fp16 #mdeberta not working with fp16
+    fp16=False #mdeberta not working with fp16
 )
 
 
@@ -132,11 +94,18 @@ def auc_from_pred(targets, predictions):
     fpr, tpr, _ = roc_curve(targets, predictions,  pos_label=1)
     return auc(fpr, tpr)
 
+def softmax(x):
+    e_x = np.exp(x - np.max(x))
+    return e_x / e_x.sum(axis=0) # only difference
+
 def compute_metrics(eval_pred):
     predictions, labels = eval_pred
-    predictions = np.argmax(predictions, axis=1)
-    return {"AUC": auc_from_pred(labels, predictions), "ACC": accuracy_score(labels, predictions), "MacroF1": f1_score(labels, predictions, average='macro'), "MAE": mean_absolute_error(labels, predictions)}
-    # return {"ACC": accuracy_score(labels, predictions), "MacroF1": f1_score(labels, predictions, average='macro'), "MAE": mean_absolute_error(labels, predictions)}
+    new_predictions = []
+    for p in predictions:
+        new_predictions.append(softmax(p)[1])
+    predictions = new_predictions
+    round_preidictions = [round(p) for p in predictions]
+    return {"AUC": auc_from_pred(labels, predictions), "ACC": accuracy_score(labels, round_preidictions), "MacroF1": f1_score(labels, round_preidictions, average='macro'), "MAE": mean_absolute_error(labels, round_preidictions)}
 
 optimizer = Adafactor(model.parameters(), scale_parameter=True, relative_step=True, warmup_init=True, lr=None)
 class MyAdafactorSchedule(AdafactorSchedule):
@@ -157,17 +126,20 @@ trainer = Trainer(
     tokenizer=tokenizer,
     compute_metrics=compute_metrics,
     callbacks = [EarlyStoppingCallback(early_stopping_patience=5)],
-    optimizers=(optimizer, lr_scheduler)
+    # optimizers=(optimizer, lr_scheduler)
+    optimizers=(optimizer, AdafactorSchedule(optimizer))
 )
-
-start = time.time()
 trainer.train()
-end = time.time()
-print(f'{model_name} memory footprint {model.get_memory_footprint()/1024/1024/1024}')
-print(f'{model_name} fine-tuning took {(end - start)/60} min')
 
-start = time.time()
 shutil.rmtree(output_model, ignore_errors=True)
 trainer.save_model()
-end = time.time()
-print(f'{output_model} saving took {(end - start)/60} min')
+
+
+
+
+
+
+
+
+
+

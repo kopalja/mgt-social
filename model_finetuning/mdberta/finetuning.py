@@ -45,6 +45,19 @@ class MDebertaClassifier(pl.LightningModule):
 
         self.model = DebertaForSequenceClassification.from_pretrained(my_params.model_path, num_labels=2, ignore_mismatched_sizes=True)
         self.tokenizer = AutoTokenizer.from_pretrained(my_params.model_path)
+        if self.tokenizer.pad_token is None:
+            if self.tokenizer.eos_token is not None:
+                self.tokenizer.pad_token = self.tokenizer.eos_token
+            else:
+                self.tokenizer.add_special_tokens({'pad_token': '[PAD]'})
+        
+        self.model.resize_token_embeddings(len(self.tokenizer))
+        try:
+            self.model.config.pad_token_id = self.tokenizer.get_vocab()[self.tokenizer.pad_token]
+        except:
+            print("Warning: Exception occured while setting pad_token_id")
+        
+        
         self._best_validation_loss = sys.float_info.max
         self._training_stats, self._validation_stats = Stats(), Stats()
         self._first_validation_finished = False
@@ -60,8 +73,9 @@ class MDebertaClassifier(pl.LightningModule):
         outputs = self.forward(batch)
         self._update_stats(self._training_stats, batch, outputs)
         self.lr_scheduler.step()
-        if (batch_idx % 100 == 0):
+        if (batch_idx % 50 == 0):
             loss, auc_value, accuracy, f1 =  self._compute_stats(self._training_stats)
+            self._training_stats = Stats()
             self.log_dict({"train_loss": loss, "AUC": auc_value, "ACC": accuracy, "f1": f1, "lr": self.lr_scheduler.get_last_lr()[-1]})
         return outputs.loss
 
@@ -114,8 +128,7 @@ class MDebertaClassifier(pl.LightningModule):
         if args.demo_dataset:
             train_dataset = DemoDataset(tokenizer=self.tokenizer, is_instruction=False, size=1000)
         else:
-            # train_dataset = MultitudeDataset(data_path=self.my_params.data_path, tokenizer=self.tokenizer, is_instruction=False, train_split=True, balance=BalanceType.NON)
-            train_dataset = MultitudeDataset(data_path=self.my_params.data_path, tokenizer=self.tokenizer, is_instruction=False, train_split=True, balance=BalanceType.CUTMAJORITY)
+            train_dataset = MultitudeDataset(data_path=self.my_params.data_path, tokenizer=self.tokenizer, is_instruction=False, train_split=True, balance=BalanceType.NON)
             
         dataloader = DataLoader(train_dataset, batch_size=self.my_params.train_batch_size, drop_last=True, shuffle=True, num_workers=4)
         t_total = self.my_params.num_train_epochs * len(dataloader.dataset) // self.my_params.train_batch_size
@@ -133,15 +146,16 @@ class MDebertaClassifier(pl.LightningModule):
     def _update_stats(self, stats: Stats, batch, outputs):
         stats.loss.append(outputs.loss.detach())
         logits = outputs.logits.detach().cpu()
-        outputs = torch.argmax(logits, dim=-1)
+        outputs = torch.nn.Softmax(dim=-1)(logits)[:, 1]
         stats.targets.extend(batch["target"].cpu())
         stats.predictions.extend(outputs)
         
     def _compute_stats(self, stats: Stats):
+        round_predictions = [torch.round(p) for p in stats.predictions]
         loss = torch.stack(stats.loss).mean()
         auc = auc_from_pred(stats.targets, stats.predictions)
-        accuracy = accuracy_score(stats.targets, stats.predictions)
-        f1 = f1_score(stats.targets, stats.predictions)
+        accuracy = accuracy_score(stats.targets, round_predictions)
+        f1 = f1_score(stats.targets, round_predictions)
         return loss, auc, accuracy, f1
 
     def _decode_logits(self, logits):
@@ -162,19 +176,19 @@ class MDebertaClassifier(pl.LightningModule):
 
 if __name__ == "__main__":
 
-    run_name = "mdberta_cut_majority"
+    run_name = "mdberta_no_balance_fix"
     args_dict = dict(
         output_dir=f"mdberta/models/{run_name}",
         model_path="microsoft/mdeberta-v3-base",
         data_path="/home/kopal/multitude.csv",
-        learning_rate=1e-5,
-        weight_decay=0.0,
+        learning_rate=2e-4,
+        weight_decay=0.01,
         adam_epsilon=1e-8,
-        warmup_steps=0,
-        train_batch_size=6,
-        eval_batch_size=6,
+        warmup_steps=100,
+        train_batch_size=16,
+        eval_batch_size=16,
         model_save_period_epochs=2,
-        num_train_epochs=100,
+        num_train_epochs=10,
         gradient_accumulation_steps=4,
         fp_16=False,
         max_grad_norm=1.0,
@@ -188,9 +202,10 @@ if __name__ == "__main__":
         max_epochs=args.num_train_epochs,
         precision= 16 if args.fp_16 else 32,
         gradient_clip_val=args.max_grad_norm,
+        # val_check_interval=0.1,
         logger = TensorBoardLogger(save_dir="lightning_logs", name=run_name) if args.log else None,
         callbacks=[EarlyStopping(monitor="validation_loss", mode="min", patience=10), DeviceStatsMonitor()]
-        # log_every_n_steps = 10 # default is 50
+        log_every_n_steps = 50 # default is 50
     )
 
     model = MDebertaClassifier(args)

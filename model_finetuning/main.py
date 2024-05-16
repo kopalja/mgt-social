@@ -4,15 +4,22 @@ import pytorch_lightning as pl
 
 
 from pytorch_lightning.loggers import TensorBoardLogger
-from transformers import AutoModelForSequenceClassification, AutoModelForCausalLM
+from transformers import AutoModelForSequenceClassification
 from huggingface_hub import login
+
+from peft import (
+    prepare_model_for_kbit_training,
+    LoraConfig,
+    get_peft_model,
+    PeftModel,
+)
 
 from model_trainer import TrainerForSequenceClassification
 
 
 if __name__ == "__main__":
     ### Example
-    # python main.py --data_path "/home/kopal/multidomain.csv" --model mdeberta-v3-base --domain social --language en es ru --generator gemini
+    # python main.py --data_path "/home/kopal/multidomain.csv" --model microsoft/mdeberta-v3-base --domain social_media --language en es ru --generator gemini
     parser = argparse.ArgumentParser()
     parser.add_argument("--data_path", type=str, required=True)
     parser.add_argument(
@@ -24,7 +31,7 @@ if __name__ == "__main__":
             "tiiuae/falcon-11B",
             "mistralai/Mistral-7B-v0.1",
             "meta-llama/Meta-Llama-3-8B",
-            "aya-101",
+            "aya-101", # TODO
         ],
         nargs="?",
         required=True,
@@ -32,13 +39,13 @@ if __name__ == "__main__":
     parser.add_argument("--domain", choices=["news", "social_media"], nargs="?")
     parser.add_argument(
         "--language",
-        default=["en", "pt", "de", "nl", "es", "ru", "pl", "ar", "bg", "ca", "uk", "pl", "ro"],
+        choices=["en", "pt", "de", "nl", "es", "ru", "pl", "ar", "bg", "ca", "uk", "pl", "ro"],
+        default=["en"],
         nargs="+",
-        required=True,
     )
     parser.add_argument(
         "--generator",
-        default=[
+        choices=[
             "gemini",
             "gpt-3.5-turbo-0125",
             "opt-iml-max-30b",
@@ -52,19 +59,28 @@ if __name__ == "__main__":
         required=True,
     )
     parser.add_argument("--hf_token", type=str)
+    parser.add_argument('--use_peft', action=argparse.BooleanOptionalAction, default=False)
     args = parser.parse_args()
 
-    if args.hf_token:
-        login(token=args.hf_token)
+    # if args.hf_token:
+    #     login(token=args.hf_token)
 
 
+    # 1) Prepare datatset
     df = pd.read_csv(args.data_path, index_col=0)
     df = df[(df['multi_label'].isin([args.generator, "human"])) & (df['language'].isin(args.language))]
     if args.domain:
         df = df[df['domain'] == args.domain]
 
 
+    # 2) Prepare model
     model = AutoModelForSequenceClassification.from_pretrained(args.model, num_labels=2, ignore_mismatched_sizes=True)
+
+    if args.use_peft:
+        model = prepare_model_for_kbit_training(model)
+        model = get_peft_model(model, LoraConfig(task_type="SEQ_CLS"))
+    
+    
     train_args = argparse.Namespace(
         output_dir=f"saved_models/{args.model.split('/')[-1]}",
         model=model,
@@ -74,8 +90,8 @@ if __name__ == "__main__":
         weight_decay=0.01,
         adam_epsilon=1e-8,
         warmup_steps=0,
-        train_batch_size=2,
-        eval_batch_size=2,
+        train_batch_size=1,
+        eval_batch_size=1,
         model_save_period_epochs=2,
         num_train_epochs=10,
         gradient_accumulation_steps=4,

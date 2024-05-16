@@ -145,15 +145,17 @@ class TrainerForSequenceClassification(pl.LightningModule):
     def _update_stats(self, stats: Stats, batch, outputs):
         stats.loss.append(outputs.loss.detach())
         logits = outputs.logits.detach().cpu()
-        outputs = torch.argmax(logits, dim=-1)
+        # outputs = torch.argmax(logits, dim=-1)
+        outputs = torch.nn.Softmax(dim=-1)(logits)[:, 1]
         stats.targets.extend(batch["target"].cpu())
         stats.predictions.extend(outputs)
         
     def _compute_stats(self, stats: Stats):
+        round_predictions = [torch.round(p) for p in stats.predictions]
         loss = torch.stack(stats.loss).mean()
         auc = auc_from_pred(stats.targets, stats.predictions)
-        accuracy = accuracy_score(stats.targets, stats.predictions)
-        f1 = f1_score(stats.targets, stats.predictions)
+        accuracy = accuracy_score(stats.targets, round_predictions)
+        f1 = f1_score(stats.targets, round_predictions)
         return loss, auc, accuracy, f1
 
     def _decode_logits(self, logits):
