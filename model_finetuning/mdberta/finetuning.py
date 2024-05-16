@@ -202,7 +202,7 @@ if __name__ == "__main__":
         max_epochs=args.num_train_epochs,
         precision= 16 if args.fp_16 else 32,
         gradient_clip_val=args.max_grad_norm,
-        # val_check_interval=0.1,
+        val_check_interval=0.1,
         logger = TensorBoardLogger(save_dir="lightning_logs", name=run_name) if args.log else None,
         callbacks=[EarlyStopping(monitor="validation_loss", mode="min", patience=10), DeviceStatsMonitor()]
         log_every_n_steps = 50 # default is 50
