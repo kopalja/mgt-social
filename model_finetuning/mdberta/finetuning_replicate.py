@@ -1,12 +1,5 @@
-DATAPATH = "/home/kopal/multitude.csv" #path of the dataset for training
-MODELPATH = "./tmp/" #path where fine-tuned model will be saved
-
-PRE_TRAINED_MODEL_NAME = "microsoft/mdeberta-v3-base" # sys.argv[1]
-model_name = PRE_TRAINED_MODEL_NAME.split('/')[-1]
-dataset = "all" # sys.argv[2] #'en', 'es', 'ru', 'all', 'en3'
-generative_model = "tmp" # sys.argv[3] #'text-davinci-003', 'gpt-3.5-turbo', 'gpt-4', 'llama-65b', 'opt-66b', 'opt-iml-max-1.3b', 'all'
-output_model = f'{MODELPATH}{model_name}-finetuned-{dataset}-{generative_model}'
-
+DATAPATH = "/home/kopal/multitude.csv"
+PRE_TRAINED_MODEL_NAME = "microsoft/mdeberta-v3-base"
 
 import pandas as pd
 from datasets import Dataset
@@ -21,7 +14,6 @@ import time
 RANDOM_SEED = 42
 np.random.seed(RANDOM_SEED)
 torch.manual_seed(RANDOM_SEED)
-
 torch.cuda.empty_cache()
 
     
@@ -70,7 +62,7 @@ logging_steps = round(2000 / (batch_size * gradient_accumulation_steps)) #eval a
 
 
 args = TrainingArguments(
-    output_dir=output_model,
+    output_dir="saved_models/tmp",
     evaluation_strategy = "steps",
     logging_steps = logging_steps, #50,
     save_strategy="steps",
@@ -96,7 +88,7 @@ def auc_from_pred(targets, predictions):
 
 def softmax(x):
     e_x = np.exp(x - np.max(x))
-    return e_x / e_x.sum(axis=0) # only difference
+    return e_x / e_x.sum(axis=0)
 
 def compute_metrics(eval_pred):
     predictions, labels = eval_pred
@@ -131,8 +123,8 @@ trainer = Trainer(
 )
 trainer.train()
 
-shutil.rmtree(output_model, ignore_errors=True)
-trainer.save_model()
+# shutil.rmtree(output_model, ignore_errors=True)
+# trainer.save_model()
 
 
 
