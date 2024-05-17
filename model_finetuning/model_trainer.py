@@ -120,26 +120,15 @@ class TrainerForSequenceClassification(pl.LightningModule):
             self._save_model()
 
     def configure_optimizers(self):
-        # no_decay = ["bias", "LayerNorm.weight"]
-        # optimizer_grouped_parameters = [
-        #     {
-        #         "params": [p for n, p in self.model.named_parameters() if not any(nd in n for nd in no_decay)],
-        #         "weight_decay": self.my_params.weight_decay,
-        #     },
-        #     {
-        #         "params": [p for n, p in self.model.named_parameters() if any(nd in n for nd in no_decay)],
-        #         "weight_decay": 0.0,
-        #     },
-        # ]
         self.opt = Adafactor(self.model.parameters(), scale_parameter=True, relative_step=True, warmup_init=True, lr=None)
         self.lr_scheduler = MyAdafactorSchedule(self.opt)
         return self.opt
         
     def train_dataloader(self):
         if self.my_params.demo_dataset:
-            train_dataset = DemoDataset(tokenizer=self.tokenizer, is_instruction=False, size=1000)
+            train_dataset = DemoDataset(tokenizer=self.tokenizer, is_instruction=False, size=4000)
         else:
-            train_dataset = MultidomaindeDataset(df=self.my_params.data, tokenizer=self.tokenizer, is_instruction=False, train_split=True, balance=BalanceType.DUPLICATEMINORITY)
+            train_dataset = MultidomaindeDataset(df=self.my_params.data, tokenizer=self.tokenizer, is_instruction=False, train_split=True, balance=BalanceType.NON)
             
         dataloader = DataLoader(train_dataset, batch_size=self.my_params.train_batch_size, drop_last=True, shuffle=True, num_workers=4)
         return dataloader

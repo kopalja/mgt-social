@@ -4,6 +4,7 @@ import pytorch_lightning as pl
 
 
 from pytorch_lightning.loggers import TensorBoardLogger
+from pytorch_lightning.callbacks.early_stopping import EarlyStopping
 from transformers import AutoModelForSequenceClassification
 from huggingface_hub import login
 
@@ -40,7 +41,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--language",
         choices=["en", "pt", "de", "nl", "es", "ru", "pl", "ar", "bg", "ca", "uk", "pl", "ro"],
-        default=["en"],
+        default=[],
         nargs="+",
     )
     parser.add_argument(
@@ -56,26 +57,29 @@ if __name__ == "__main__":
             "Llama-2-70b-chat-hf",
         ],
         nargs="?",
-        required=True,
     )
     parser.add_argument("--hf_token", type=str)
+    parser.add_argument('--job_name', type=str, default="default")
     parser.add_argument('--use_peft', action=argparse.BooleanOptionalAction, default=False)
+    parser.add_argument('--demo_dataset', action=argparse.BooleanOptionalAction, default=False)
     args = parser.parse_args()
 
     # if args.hf_token:
     #     login(token=args.hf_token)
 
 
-    # 1) Prepare datatset
+    # 1) Create datatset
     df = pd.read_csv(args.data_path, index_col=0)
-    df = df[(df['multi_label'].isin([args.generator, "human"])) & (df['language'].isin(args.language))]
+    if args.language:
+        df = df[df['language'].isin(args.language)]
+    if args.generator:
+        df = df[df['multi_label'].isin([args.generator, "human"])]
     if args.domain:
         df = df[df['domain'] == args.domain]
 
 
     # 2) Prepare model
     model = AutoModelForSequenceClassification.from_pretrained(args.model, num_labels=2, ignore_mismatched_sizes=True)
-
     if args.use_peft:
         model = prepare_model_for_kbit_training(model)
         model = get_peft_model(model, LoraConfig(task_type="SEQ_CLS"))
@@ -90,24 +94,27 @@ if __name__ == "__main__":
         weight_decay=0.01,
         adam_epsilon=1e-8,
         warmup_steps=0,
-        train_batch_size=1,
-        eval_batch_size=1,
+        train_batch_size=2,
+        eval_batch_size=2,
         model_save_period_epochs=2,
-        num_train_epochs=10,
+        num_train_epochs=20,
         gradient_accumulation_steps=4,
         fp_16=False,
         log=True,
-        demo_dataset=False
+        demo_dataset=args.demo_dataset
     )
     model_trainer = TrainerForSequenceClassification(train_args)
     
     
+    log_path = f"models_testing/{args.model.split('/')[-1]}_{args.job_name}_{'demo' if args.demo_dataset else ''}"
     train_params = dict(
         accumulate_grad_batches=train_args.gradient_accumulation_steps,
         max_epochs=train_args.num_train_epochs,
         precision= "16-mixed" if train_args.fp_16 else "32",
-        logger = TensorBoardLogger(save_dir="lightning_logs", name=f"models/{args.model.split('/')[-1]}") if train_args.log else None,
+        # val_check_interval=0.2,
+        logger = TensorBoardLogger(save_dir="lightning_logs", name=log_path if train_args.log else None),
         # callbacks=[EarlyStopping(monitor="validation_loss", mode="min", patience=10), DeviceStatsMonitor()]
+        callbacks=[EarlyStopping(monitor="validation_loss", mode="min", patience=8)]
         # log_every_n_steps = 10 # default is 50
     )
     pl.Trainer(**train_params).fit(model_trainer)
