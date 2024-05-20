@@ -13,6 +13,10 @@ set -xe
 eval "$(conda shell.bash hook)"
 conda activate mgt-social
 
+USE_PEFT="True"
+if [[ "${MODEL_TYPE}" == "FacebookAI/xlm-roberta-large" ]]; then
+    USE_PEFT="False"
+fi
 
 echo "Running ${MODEL_TYPE}"
 python main.py --data_path "/home/kopal/multidomain_subset.csv" \
@@ -21,5 +25,5 @@ python main.py --data_path "/home/kopal/multidomain_subset.csv" \
                --language en es ru \
                --generator gemini \
                --demo_dataset \
-               --use_peft
+               --use_peft=${USE_PEFT}
 

@@ -1,4 +1,5 @@
 import argparse
+import os
 import pandas as pd
 import pytorch_lightning as pl
 
@@ -19,7 +20,6 @@ from misc import QUANTIZATION_CONFIG
 
 from model_trainer import TrainerForSequenceClassification
 
-
 if __name__ == "__main__":
     ### Example
     # python main.py --data_path "/home/kopal/multidomain.csv" --model microsoft/mdeberta-v3-base --domain social_media --language en es ru --generator gemini
@@ -35,7 +35,8 @@ if __name__ == "__main__":
             "mistralai/Mistral-7B-v0.1",
             "meta-llama/Meta-Llama-3-8B",
             "bigscience/bloomz-3b",
-            "aya-101", # TODO
+            "google/mt5-small",
+            "CohereForAI/aya-101",
         ],
         nargs="?",
         required=True,
@@ -89,6 +90,8 @@ if __name__ == "__main__":
         'mistralai/Mistral-7B-v0.1': ['q_proj', 'k_proj', 'v_proj'],
         'meta-llama/Meta-Llama-3-8B': ['q_proj', 'k_proj', 'v_proj'],
         'bigscience/bloomz-3b': ['query_key_value'],
+        'google/mt5-small': None,
+        'CohereForAI/aya-101': None
     }
 
 
@@ -104,16 +107,16 @@ if __name__ == "__main__":
         output_dir=f"saved_models/{args.model.split('/')[-1]}",
         model=model,
         data=df,
-        tokenizer_path=args.model,
+        model_name=args.model,
         learning_rate=2e-4,
         weight_decay=0.01,
         adam_epsilon=1e-8,
         warmup_steps=0,
-        train_batch_size=1,
-        eval_batch_size=1,
+        train_batch_size=16,
+        eval_batch_size=16,
         model_save_period_epochs=2,
-        num_train_epochs=20,
-        gradient_accumulation_steps=8,
+        num_train_epochs=10,
+        gradient_accumulation_steps=4,
         fp_16=False,
         log=True,
         demo_dataset=args.demo_dataset
@@ -121,13 +124,16 @@ if __name__ == "__main__":
     model_trainer = TrainerForSequenceClassification(train_args)
     
     
-    log_path = f"models_testing/{args.model.split('/')[-1]}_{args.job_name}_{'demo' if args.demo_dataset else ''}"
+    log_root = "lightning_logs"
+    run_name = "models_testing"
+    run_name += f"_{len([x for x in os.listdir(log_root) if x.startswith(run_name)])}"
+    run_name = os.path.join(run_name, f"{args.model.split('/')[-1]}_{args.job_name}_{'demo' if args.demo_dataset else ''}")
     train_params = dict(
         accumulate_grad_batches=train_args.gradient_accumulation_steps,
         max_epochs=train_args.num_train_epochs,
         precision= "16-mixed" if train_args.fp_16 else "32",
         # val_check_interval=0.2,
-        logger = TensorBoardLogger(save_dir="lightning_logs", name=log_path if train_args.log else None),
+        logger = TensorBoardLogger(save_dir=log_root, name=run_name if train_args.log else None),
         # callbacks=[EarlyStopping(monitor="validation_loss", mode="min", patience=10), DeviceStatsMonitor()]
         callbacks=[EarlyStopping(monitor="validation_loss", mode="min", patience=8)]
         # log_every_n_steps = 10 # default is 50

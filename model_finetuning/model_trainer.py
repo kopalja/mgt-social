@@ -18,8 +18,11 @@ from transformers import (
     AdamW,
     DebertaForSequenceClassification,
     AutoTokenizer,
+    AutoModelForSequenceClassification,
     get_linear_schedule_with_warmup,
 )
+
+from peft import PeftModel
 
 from transformers.optimization import Adafactor, AdafactorSchedule
 
@@ -56,7 +59,7 @@ class TrainerForSequenceClassification(pl.LightningModule):
         self.my_params = my_params
 
         self.model = my_params.model
-        self.tokenizer = AutoTokenizer.from_pretrained(my_params.tokenizer_path)
+        self.tokenizer = AutoTokenizer.from_pretrained(my_params.model_name)
         if self.tokenizer .pad_token is None:
             if self.tokenizer .eos_token is not None:
                 self.tokenizer .pad_token = self.tokenizer .eos_token
@@ -128,14 +131,14 @@ class TrainerForSequenceClassification(pl.LightningModule):
         if self.my_params.demo_dataset:
             train_dataset = DemoDataset(tokenizer=self.tokenizer, is_instruction=False, size=4000)
         else:
-            train_dataset = MultidomaindeDataset(df=self.my_params.data, tokenizer=self.tokenizer, is_instruction=False, train_split=True, balance=BalanceType.NON)
+            train_dataset = MultidomaindeDataset(df=self.my_params.data, tokenizer=self.tokenizer, is_instruction=False, train_split=True, balance=BalanceType.DUPLICATEMINORITY)
             
         dataloader = DataLoader(train_dataset, batch_size=self.my_params.train_batch_size, drop_last=True, shuffle=True, num_workers=4)
         return dataloader
 
     def val_dataloader(self):
         if self.my_params.demo_dataset:
-            val_dataset = DemoDataset(tokenizer=self.tokenizer, is_instruction=False, size=200)
+            val_dataset = DemoDataset(tokenizer=self.tokenizer, is_instruction=False, size=100)
         else:
             val_dataset = MultidomaindeDataset(df=self.my_params.data, tokenizer=self.tokenizer, is_instruction=False, train_split=False, balance=BalanceType.NON)
             
@@ -169,6 +172,14 @@ class TrainerForSequenceClassification(pl.LightningModule):
 
         self.model.save_pretrained(best_model_path)
         self.tokenizer.save_pretrained(best_model_path)
+        
+        base_model = AutoModelForSequenceClassification.from_pretrained(self.my_params.model_name, num_labels=2)
+        model_to_save = PeftModel.from_pretrained(base_model, best_model_path)
+        model_to_save = model_to_save.merge_and_unload()
+        
+        merged_model_path = os.path.join(self.my_params.output_dir, "merged")
+        os.makedirs(merged_model_path, exist_ok=True)
+        model_to_save.save_pretrained(merged_model_path)
 
 
 

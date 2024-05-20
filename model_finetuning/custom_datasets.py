@@ -138,8 +138,8 @@ class DemoDataset(Dataset):
         self._is_instruction = is_instruction
         self.inputs, self.targets = [], []
         for _ in range(size):
-            x = np.random.randint(100)
-            y = np.random.randint(100)
+            x = np.random.randint(20)
+            y = np.random.randint(20)
 
             self.inputs.append(tokenizer(
                 f"ADDITION TASK: {x} + {y}", max_length=max_input_token, pad_to_max_length=True, return_tensors="pt"
