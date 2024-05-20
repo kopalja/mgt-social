@@ -15,6 +15,8 @@ from peft import (
     PeftModel,
 )
 
+from misc import QUANTIZATION_CONFIG
+
 from model_trainer import TrainerForSequenceClassification
 
 
@@ -32,6 +34,7 @@ if __name__ == "__main__":
             "tiiuae/falcon-11B",
             "mistralai/Mistral-7B-v0.1",
             "meta-llama/Meta-Llama-3-8B",
+            "bigscience/bloomz-3b",
             "aya-101", # TODO
         ],
         nargs="?",
@@ -64,8 +67,8 @@ if __name__ == "__main__":
     parser.add_argument('--demo_dataset', action=argparse.BooleanOptionalAction, default=False)
     args = parser.parse_args()
 
-    # if args.hf_token:
-    #     login(token=args.hf_token)
+    if args.hf_token:
+        login(token=args.hf_token)
 
 
     # 1) Create datatset
@@ -77,12 +80,24 @@ if __name__ == "__main__":
     if args.domain:
         df = df[df['domain'] == args.domain]
 
+    
+    target_map = {
+        'microsoft/mdeberta-v3-base': ['query_proj', 'key_proj', 'value_proj'],
+        'FacebookAI/xlm-roberta-large': ['query', 'key', 'value'],
+        'tiiuae/falcon-rw-1b': ['query_key_value'],
+        'tiiuae/falcon-11B': ['query_key_value'],
+        'mistralai/Mistral-7B-v0.1': ['q_proj', 'k_proj', 'v_proj'],
+        'meta-llama/Meta-Llama-3-8B': ['q_proj', 'k_proj', 'v_proj'],
+        'bigscience/bloomz-3b': ['query_key_value'],
+    }
+
 
     # 2) Prepare model
-    model = AutoModelForSequenceClassification.from_pretrained(args.model, num_labels=2, ignore_mismatched_sizes=True)
+    model = AutoModelForSequenceClassification.from_pretrained(args.model, quantization_config = QUANTIZATION_CONFIG, num_labels=2, ignore_mismatched_sizes=True)
     if args.use_peft:
         model = prepare_model_for_kbit_training(model)
-        model = get_peft_model(model, LoraConfig(task_type="SEQ_CLS"))
+        model = get_peft_model(model, LoraConfig(task_type="SEQ_CLS", target_modules=target_map[args.model], r=4))
+    print(model)
     
     
     train_args = argparse.Namespace(
@@ -94,11 +109,11 @@ if __name__ == "__main__":
         weight_decay=0.01,
         adam_epsilon=1e-8,
         warmup_steps=0,
-        train_batch_size=2,
-        eval_batch_size=2,
+        train_batch_size=1,
+        eval_batch_size=1,
         model_save_period_epochs=2,
         num_train_epochs=20,
-        gradient_accumulation_steps=4,
+        gradient_accumulation_steps=8,
         fp_16=False,
         log=True,
         demo_dataset=args.demo_dataset
