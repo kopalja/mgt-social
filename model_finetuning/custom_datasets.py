@@ -18,29 +18,28 @@ class MultidomaindeDataset(Dataset):
         self.inputs, self.targets = [], []
         seed = 42
         if train_split:
-            train = df[df["split"] == "train"]
+            data = df[len(df)//10:]
             
             if balance == BalanceType.NON:
-                train = train
+                data = data
             elif balance == BalanceType.CUTMAJORITY:
-                train = train.groupby(['label']).apply(lambda x: x.iloc[[i % len(x) for i in range(train.label.value_counts().min())]]).sample(frac=1, random_state = seed).reset_index(drop=True)
+                data = data.groupby(['label']).apply(lambda x: x.iloc[[i % len(x) for i in range(data.label.value_counts().min())]]).sample(frac=1, random_state = seed).reset_index(drop=True)
             elif balance == BalanceType.DUPLICATEMINORITY:
-                train = train.groupby(['label']).apply(lambda x: x.iloc[[i % len(x) for i in range(train.label.value_counts().max())]]).sample(frac=1, random_state = seed).reset_index(drop=True)
+                data = data.groupby(['label']).apply(lambda x: x.iloc[[i % len(x) for i in range(data.label.value_counts().max())]]).sample(frac=1, random_state = seed).reset_index(drop=True)
             elif balance == BalanceType.COMBINATION:
-                df_max = train.label.value_counts().max()
-                df_min = train.label.value_counts().min()
-                train = train.groupby(['label']).apply(lambda x: x.iloc[[i % len(x) for i in range(train.label.value_counts().max())]]).sample(frac=1, random_state = seed).reset_index(drop=True)
-                train = train.groupby(['label']).apply(lambda x: x.iloc[[i % len(x) for i in range((df_max - df_min) // 2)]]).sample(frac=1, random_state = seed).reset_index(drop=True)
+                df_max = data.label.value_counts().max()
+                df_min = data.label.value_counts().min()
+                data = data.groupby(['label']).apply(lambda x: x.iloc[[i % len(x) for i in range(data.label.value_counts().max())]]).sample(frac=1, random_state = seed).reset_index(drop=True)
+                data = data.groupby(['label']).apply(lambda x: x.iloc[[i % len(x) for i in range((df_max - df_min) // 2)]]).sample(frac=1, random_state = seed).reset_index(drop=True)
                 
-            data = train[len(train)//10:]
         else:
-            data = df[df["split"] == "test"]
+            data = df[:len(df)//10]
 
         if max_length is not None:
             data = data[:max_length]
 
         print("===================")
-        print(f"{'Train' if train_split else 'Test'} dataset size:", len(data))
+        print(f"{'Train' if train_split else 'Validation'} dataset size:", len(data))
 
         for x in data.itertuples():
             if is_instruction:

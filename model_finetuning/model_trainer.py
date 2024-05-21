@@ -1,6 +1,7 @@
 import argparse
 import os
 import sys
+from tqdm import tqdm
 
 
 import pandas as pd
@@ -133,22 +134,23 @@ class TrainerForSequenceClassification(pl.LightningModule):
             self._save_model()
 
     def configure_optimizers(self):
-        no_decay = ["bias", "LayerNorm.weight"]
-        optimizer_grouped_parameters = [
-            {
-                "params": [p for n, p in self.model.named_parameters() if not any(nd in n for nd in no_decay)],
-                "weight_decay": self.my_params.weight_decay,
-            },
-            {
-                "params": [p for n, p in self.model.named_parameters() if any(nd in n for nd in no_decay)],
-                "weight_decay": 0.0,
-            },
-        ]
-        self.opt = AdamW(optimizer_grouped_parameters, lr=self.my_params.learning_rate, eps=self.my_params.adam_epsilon, weight_decay = self.my_params.weight_decay)
+        if self.my_params.using_peft:
+            no_decay = ["bias", "LayerNorm.weight"]
+            optimizer_grouped_parameters = [
+                {
+                    "params": [p for n, p in self.model.named_parameters() if not any(nd in n for nd in no_decay)],
+                    "weight_decay": self.my_params.weight_decay,
+                },
+                {
+                    "params": [p for n, p in self.model.named_parameters() if any(nd in n for nd in no_decay)],
+                    "weight_decay": 0.0,
+                },
+            ]
+            self.opt = AdamW(optimizer_grouped_parameters, lr=self.my_params.learning_rate, eps=self.my_params.adam_epsilon, weight_decay = self.my_params.weight_decay)
+        else:
+            self.opt = Adafactor(self.model.parameters(), scale_parameter=True, relative_step=True, warmup_init=True, lr=None)
+            self.lr_scheduler = MyAdafactorSchedule(self.opt)
         return self.opt
-        # self.opt = Adafactor(self.model.parameters(), scale_parameter=True, relative_step=True, warmup_init=True, lr=None)
-        # self.lr_scheduler = MyAdafactorSchedule(self.opt)
-        # return self.opt
         
     def train_dataloader(self):
         if self.my_params.demo_dataset:
@@ -157,8 +159,9 @@ class TrainerForSequenceClassification(pl.LightningModule):
             train_dataset = MultidomaindeDataset(df=self.my_params.data, tokenizer=self.tokenizer, is_instruction=False, train_split=True, balance=BalanceType.DUPLICATEMINORITY)
             
         dataloader = DataLoader(train_dataset, batch_size=self.my_params.train_batch_size, drop_last=True, shuffle=True, num_workers=4)
-        t_total = self.my_params.num_train_epochs * len(dataloader.dataset) // self.my_params.train_batch_size
-        self.lr_scheduler = get_linear_schedule_with_warmup(self.opt, num_warmup_steps=self.my_params.warmup_steps, num_training_steps=t_total)
+        if self.my_params.using_peft:
+            t_total = self.my_params.num_train_epochs * len(dataloader.dataset) // self.my_params.train_batch_size
+            self.lr_scheduler = get_linear_schedule_with_warmup(self.opt, num_warmup_steps=self.my_params.warmup_steps, num_training_steps=t_total)
         return dataloader
 
     def val_dataloader(self):
@@ -168,6 +171,23 @@ class TrainerForSequenceClassification(pl.LightningModule):
             val_dataset = MultidomaindeDataset(df=self.my_params.data, tokenizer=self.tokenizer, is_instruction=False, train_split=False, balance=BalanceType.NON)
             
         return DataLoader(val_dataset, batch_size=self.my_params.eval_batch_size, num_workers=4, shuffle=True)
+
+    def on_train_end(self):
+        print("Running model on whole dataset")
+        df = pd.read_csv(self.my_params.data_path, index_col=0)
+        outputs = []
+        device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+        with torch.no_grad():
+            for index, row in tqdm(df.iterrows(), total=df.shape[0]):
+                inpt = self.tokenizer(row.text, max_length=512, padding="max_length", truncation=True, return_tensors="pt")
+                output = self.model(inpt["input_ids"].to(device), attention_mask=inpt["attention_mask"].to(device))
+                logits = output.logits.detach().cpu()[0]
+                prob = torch.nn.Softmax(dim=0)(logits)[1].numpy()
+                outputs.append(prob)
+            
+        df[f"{self.my_params.model_name}_predictions"] = outputs
+        df.to_csv(os.path.join(self.my_params.output_dir, f"{self.my_params.model_name.split('/')[-1]}_predictions.csv"))
+
 
     def _update_stats(self, stats: Stats, batch, outputs):
         stats.loss.append(outputs.loss.detach())

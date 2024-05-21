@@ -22,12 +22,9 @@ fi
 # fi
 
 echo "Running ${MODEL_TYPE}"
-python main.py --data_path "/home/kopal/multidomain_subset.csv" \
+python main.py --data_path "/home/kopal/multidomain.csv" \
                --model ${MODEL_TYPE} \
                --domain social_media \
-               --language en es ru \
-               --generator gemini \
                --job_name ${JOB_NAME} \
-               --demo_dataset \
                ${USE_PEFT}
 

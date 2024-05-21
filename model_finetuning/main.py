@@ -52,15 +52,23 @@ if __name__ == "__main__":
         "--generator",
         choices=[
             "gemini",
+            "Llama-2-70b-chat-hf",
             "gpt-3.5-turbo-0125",
             "opt-iml-max-30b",
             "aya-101",
             "v5-Eagle-7B-HF",
             "Mistral-7B-Instruct-v0.2",
             "vicuna-13b",
-            "Llama-2-70b-chat-hf",
         ],
-        nargs="?",
+        default=[
+            "gpt-3.5-turbo-0125",
+            "opt-iml-max-30b",
+            "aya-101",
+            "v5-Eagle-7B-HF",
+            "Mistral-7B-Instruct-v0.2",
+            "vicuna-13b",
+        ],
+        nargs="+",
     )
     parser.add_argument("--hf_token", type=str)
     parser.add_argument('--job_name', type=str, default="default")
@@ -74,12 +82,16 @@ if __name__ == "__main__":
 
     # 1) Create datatset
     df = pd.read_csv(args.data_path, index_col=0)
+    df = df[df["split"] == "train"]
     if args.language:
         df = df[df['language'].isin(args.language)]
     if args.generator:
-        df = df[df['multi_label'].isin([args.generator, "human"])]
+        df = df[df['multi_label'].isin(args.generator + ["human"])]
     if args.domain:
         df = df[df['domain'] == args.domain]
+
+    print("Training dataset:")
+    print(df)
 
     
     target_map = {
@@ -91,7 +103,7 @@ if __name__ == "__main__":
         'meta-llama/Meta-Llama-3-8B': ['q_proj', 'k_proj', 'v_proj'],
         'bigscience/bloomz-3b': ['query_key_value'],
         'google/mt5-small': None,
-        'CohereForAI/aya-101': None
+        'CohereForAI/aya-101': None # Default
     }
 
 
@@ -108,6 +120,7 @@ if __name__ == "__main__":
     train_args = argparse.Namespace(
         output_dir=f"saved_models/{args.model.split('/')[-1]}",
         model=model,
+        data_path=args.data_path,
         data=df,
         model_name=args.model,
         learning_rate=2e-4,
@@ -117,8 +130,9 @@ if __name__ == "__main__":
         train_batch_size=1,
         eval_batch_size=1,
         model_save_period_epochs=2,
-        num_train_epochs=8,
+        num_train_epochs=2,
         gradient_accumulation_steps=8,
+        using_peft=args.use_peft,
         fp_16=False,
         log=True,
         log_to_console=True,
@@ -132,7 +146,7 @@ if __name__ == "__main__":
         accumulate_grad_batches=train_args.gradient_accumulation_steps,
         max_epochs=train_args.num_train_epochs,
         precision= "16-mixed" if train_args.fp_16 else "32",
-        # val_check_interval=0.2,
+        val_check_interval=0.2,
         logger = TensorBoardLogger(save_dir=os.path.join(log_root, args.job_name), name=args.model.split('/')[-1] if train_args.log else None),
         # callbacks=[EarlyStopping(monitor="validation_loss", mode="min", patience=10), DeviceStatsMonitor()]
         callbacks=[EarlyStopping(monitor="validation_loss", mode="min", patience=8)]
