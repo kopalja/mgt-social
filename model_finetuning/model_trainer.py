@@ -156,7 +156,7 @@ class TrainerForSequenceClassification(pl.LightningModule):
         if self.my_params.demo_dataset:
             train_dataset = DemoDataset(tokenizer=self.tokenizer, is_instruction=False, size=5000)
         else:
-            train_dataset = MultidomaindeDataset(df=self.my_params.data, tokenizer=self.tokenizer, is_instruction=False, train_split=True, balance=BalanceType.DUPLICATEMINORITY)
+            train_dataset = MultidomaindeDataset(df=self.my_params.data, tokenizer=self.tokenizer, is_instruction=False, train_split=True, balance=BalanceType.CUTMAJORITY)
             
         dataloader = DataLoader(train_dataset, batch_size=self.my_params.train_batch_size, drop_last=True, shuffle=True, num_workers=4)
         if self.my_params.using_peft:

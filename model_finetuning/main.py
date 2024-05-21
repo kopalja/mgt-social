@@ -89,6 +89,7 @@ if __name__ == "__main__":
         df = df[df['multi_label'].isin(args.generator + ["human"])]
     if args.domain:
         df = df[df['domain'] == args.domain]
+    # df['source'] = [x.replace('multisocial_', '') for x in df['source']] # Dominik
 
     print("Training dataset:")
     print(df)
@@ -127,10 +128,10 @@ if __name__ == "__main__":
         weight_decay=0.01,
         adam_epsilon=1e-8,
         warmup_steps=100,
-        train_batch_size=1,
-        eval_batch_size=1,
+        train_batch_size=1 if "aya" in args.model else 2,
+        eval_batch_size=1 if "aya" in args.model else 2,
         model_save_period_epochs=2,
-        num_train_epochs=2,
+        num_train_epochs=1,
         gradient_accumulation_steps=8,
         using_peft=args.use_peft,
         fp_16=False,
