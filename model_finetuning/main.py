@@ -96,10 +96,12 @@ if __name__ == "__main__":
 
 
     # 2) Prepare model
-    model = AutoModelForSequenceClassification.from_pretrained(args.model, quantization_config = QUANTIZATION_CONFIG, num_labels=2, ignore_mismatched_sizes=True)
     if args.use_peft:
+        model = AutoModelForSequenceClassification.from_pretrained(args.model, quantization_config = QUANTIZATION_CONFIG, num_labels=2, ignore_mismatched_sizes=True)
         model = prepare_model_for_kbit_training(model)
         model = get_peft_model(model, LoraConfig(task_type="SEQ_CLS", target_modules=target_map[args.model], r=4))
+    else:
+        model = AutoModelForSequenceClassification.from_pretrained(args.model, num_labels=2, ignore_mismatched_sizes=True)
     print(model)
     
     
@@ -111,29 +113,27 @@ if __name__ == "__main__":
         learning_rate=2e-4,
         weight_decay=0.01,
         adam_epsilon=1e-8,
-        warmup_steps=0,
-        train_batch_size=16,
-        eval_batch_size=16,
+        warmup_steps=100,
+        train_batch_size=1,
+        eval_batch_size=1,
         model_save_period_epochs=2,
-        num_train_epochs=10,
-        gradient_accumulation_steps=4,
+        num_train_epochs=8,
+        gradient_accumulation_steps=8,
         fp_16=False,
         log=True,
-        demo_dataset=args.demo_dataset
+        log_to_console=True,
+        demo_dataset=args.demo_dataset,
     )
     model_trainer = TrainerForSequenceClassification(train_args)
     
     
     log_root = "lightning_logs"
-    run_name = "models_testing"
-    run_name += f"_{len([x for x in os.listdir(log_root) if x.startswith(run_name)])}"
-    run_name = os.path.join(run_name, f"{args.model.split('/')[-1]}_{args.job_name}_{'demo' if args.demo_dataset else ''}")
     train_params = dict(
         accumulate_grad_batches=train_args.gradient_accumulation_steps,
         max_epochs=train_args.num_train_epochs,
         precision= "16-mixed" if train_args.fp_16 else "32",
         # val_check_interval=0.2,
-        logger = TensorBoardLogger(save_dir=log_root, name=run_name if train_args.log else None),
+        logger = TensorBoardLogger(save_dir=os.path.join(log_root, args.job_name), name=args.model.split('/')[-1] if train_args.log else None),
         # callbacks=[EarlyStopping(monitor="validation_loss", mode="min", patience=10), DeviceStatsMonitor()]
         callbacks=[EarlyStopping(monitor="validation_loss", mode="min", patience=8)]
         # log_every_n_steps = 10 # default is 50

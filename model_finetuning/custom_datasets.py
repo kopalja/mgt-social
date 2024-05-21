@@ -19,10 +19,6 @@ class MultidomaindeDataset(Dataset):
         seed = 42
         if train_split:
             train = df[df["split"] == "train"]
-            train_en = train[train.language == "en"].groupby(['multi_label']).apply(lambda x: x.sample(min(1000, len(x)), random_state = seed)).sample(frac=1., random_state = 0).reset_index(drop=True)
-            train_es = train[train.language == "es"]
-            train_ru = train[train.language == "ru"]
-            train = pd.concat([train_en, train_es, train_ru], ignore_index=True, copy=False).sample(frac=1., random_state = seed).reset_index(drop=True)
             
             if balance == BalanceType.NON:
                 train = train
@@ -138,8 +134,8 @@ class DemoDataset(Dataset):
         self._is_instruction = is_instruction
         self.inputs, self.targets = [], []
         for _ in range(size):
-            x = np.random.randint(20)
-            y = np.random.randint(20)
+            x = np.random.randint(100)
+            y = np.random.randint(100)
 
             self.inputs.append(tokenizer(
                 f"ADDITION TASK: {x} + {y}", max_length=max_input_token, pad_to_max_length=True, return_tensors="pt"

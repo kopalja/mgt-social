@@ -96,6 +96,11 @@ class TrainerForSequenceClassification(pl.LightningModule):
         loss, auc_value, accuracy, f1 =  self._compute_stats(self._training_stats)
         self._training_stats = Stats()
         self.log_dict({"train_loss": loss, "AUC": auc_value, "ACC": accuracy, "f1": f1, "lr": self.lr_scheduler.get_last_lr()[-1]})
+        if self.my_params.log_to_console:
+            print("\nTraining results: ")
+            print(f"    loss: {loss}")
+            print(f"     ACC: {accuracy}")
+            print(f"     AUC: {auc_value}")
 
     def validation_step(self, batch, batch_idx):
         outputs = self.forward(batch)
@@ -115,6 +120,11 @@ class TrainerForSequenceClassification(pl.LightningModule):
         loss, auc_value, accuracy, f1 =  self._compute_stats(self._validation_stats)
         self._validation_stats = Stats()
         self.log_dict({"validation_loss": loss, "validation_AUC": auc_value, "validation_ACC": accuracy, "validation_f1": f1})
+        if self.my_params.log_to_console:
+            print("\nValidation results: ")
+            print(f"    loss: {loss}")
+            print(f"     ACC: {accuracy}")
+            print(f"     AUC: {auc_value}")
         
         if self.current_epoch + 1 == self.my_params.num_train_epochs and self._best_validation_loss == sys.float_info.max:
             self._save_model()
@@ -123,22 +133,37 @@ class TrainerForSequenceClassification(pl.LightningModule):
             self._save_model()
 
     def configure_optimizers(self):
-        self.opt = Adafactor(self.model.parameters(), scale_parameter=True, relative_step=True, warmup_init=True, lr=None)
-        self.lr_scheduler = MyAdafactorSchedule(self.opt)
+        no_decay = ["bias", "LayerNorm.weight"]
+        optimizer_grouped_parameters = [
+            {
+                "params": [p for n, p in self.model.named_parameters() if not any(nd in n for nd in no_decay)],
+                "weight_decay": self.my_params.weight_decay,
+            },
+            {
+                "params": [p for n, p in self.model.named_parameters() if any(nd in n for nd in no_decay)],
+                "weight_decay": 0.0,
+            },
+        ]
+        self.opt = AdamW(optimizer_grouped_parameters, lr=self.my_params.learning_rate, eps=self.my_params.adam_epsilon, weight_decay = self.my_params.weight_decay)
         return self.opt
+        # self.opt = Adafactor(self.model.parameters(), scale_parameter=True, relative_step=True, warmup_init=True, lr=None)
+        # self.lr_scheduler = MyAdafactorSchedule(self.opt)
+        # return self.opt
         
     def train_dataloader(self):
         if self.my_params.demo_dataset:
-            train_dataset = DemoDataset(tokenizer=self.tokenizer, is_instruction=False, size=4000)
+            train_dataset = DemoDataset(tokenizer=self.tokenizer, is_instruction=False, size=5000)
         else:
             train_dataset = MultidomaindeDataset(df=self.my_params.data, tokenizer=self.tokenizer, is_instruction=False, train_split=True, balance=BalanceType.DUPLICATEMINORITY)
             
         dataloader = DataLoader(train_dataset, batch_size=self.my_params.train_batch_size, drop_last=True, shuffle=True, num_workers=4)
+        t_total = self.my_params.num_train_epochs * len(dataloader.dataset) // self.my_params.train_batch_size
+        self.lr_scheduler = get_linear_schedule_with_warmup(self.opt, num_warmup_steps=self.my_params.warmup_steps, num_training_steps=t_total)
         return dataloader
 
     def val_dataloader(self):
         if self.my_params.demo_dataset:
-            val_dataset = DemoDataset(tokenizer=self.tokenizer, is_instruction=False, size=100)
+            val_dataset = DemoDataset(tokenizer=self.tokenizer, is_instruction=False, size=400)
         else:
             val_dataset = MultidomaindeDataset(df=self.my_params.data, tokenizer=self.tokenizer, is_instruction=False, train_split=False, balance=BalanceType.NON)
             
