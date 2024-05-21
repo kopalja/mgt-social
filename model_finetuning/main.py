@@ -1,5 +1,7 @@
 import argparse
 import os
+import torch
+import numpy as np
 import pandas as pd
 import pytorch_lightning as pl
 
@@ -19,6 +21,12 @@ from peft import (
 from misc import QUANTIZATION_CONFIG
 
 from model_trainer import TrainerForSequenceClassification
+
+RANDOM_SEED = 42
+pl.seed_everything(RANDOM_SEED)
+np.random.seed(RANDOM_SEED)
+torch.manual_seed(RANDOM_SEED)
+
 
 if __name__ == "__main__":
     ### Example
@@ -148,6 +156,7 @@ if __name__ == "__main__":
         max_epochs=train_args.num_train_epochs,
         precision= "16-mixed" if train_args.fp_16 else "32",
         val_check_interval=0.2,
+        deterministic=True,
         logger = TensorBoardLogger(save_dir=os.path.join(log_root, args.job_name), name=args.model.split('/')[-1] if train_args.log else None),
         # callbacks=[EarlyStopping(monitor="validation_loss", mode="min", patience=10), DeviceStatsMonitor()]
         callbacks=[EarlyStopping(monitor="validation_loss", mode="min", patience=8)]
