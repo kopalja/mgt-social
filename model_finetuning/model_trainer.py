@@ -127,11 +127,9 @@ class TrainerForSequenceClassification(pl.LightningModule):
             print(f"     ACC: {accuracy}")
             print(f"     AUC: {auc_value}")
         
-        if self.current_epoch + 1 == self.my_params.num_train_epochs and self._best_validation_loss == sys.float_info.max:
+        if loss < self._best_validation_loss and self.current_epoch % self.my_params.model_save_period_epochs == 0:
             self._save_model()
-        elif loss < self._best_validation_loss and self.current_epoch % self.my_params.model_save_period_epochs == 0:
             self._best_validation_loss = loss
-            self._save_model()
 
     def configure_optimizers(self):
         if self.my_params.using_peft:
@@ -217,12 +215,13 @@ class TrainerForSequenceClassification(pl.LightningModule):
 
         self.model.save_pretrained(best_model_path)
         self.tokenizer.save_pretrained(best_model_path)
-        
-        base_model = AutoModelForSequenceClassification.from_pretrained(self.my_params.model_name, num_labels=2)
-        model_to_save = PeftModel.from_pretrained(base_model, best_model_path)
-        model_to_save = model_to_save.merge_and_unload()
-        
-        merged_model_path = os.path.join(self.my_params.output_dir, "merged")
-        os.makedirs(merged_model_path, exist_ok=True)
-        model_to_save.save_pretrained(merged_model_path)
+
+        if self.my_params.using_peft:
+            base_model = AutoModelForSequenceClassification.from_pretrained(self.my_params.model_name, num_labels=2)
+            model_to_save = PeftModel.from_pretrained(base_model, best_model_path)
+            model_to_save = model_to_save.merge_and_unload()
+            
+            merged_model_path = os.path.join(self.my_params.output_dir, "merged")
+            os.makedirs(merged_model_path, exist_ok=True)
+            model_to_save.save_pretrained(merged_model_path)
 
