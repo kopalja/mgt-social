@@ -17,7 +17,6 @@ from sklearn.metrics import accuracy_score, roc_curve, auc, f1_score
 
 from transformers import (
     AdamW,
-    DebertaForSequenceClassification,
     AutoTokenizer,
     AutoModelForSequenceClassification,
     get_linear_schedule_with_warmup,
@@ -61,11 +60,11 @@ class TrainerForSequenceClassification(pl.LightningModule):
 
         self.model = my_params.model
         self.tokenizer = AutoTokenizer.from_pretrained(my_params.model_name)
-        if self.tokenizer .pad_token is None:
-            if self.tokenizer .eos_token is not None:
-                self.tokenizer .pad_token = self.tokenizer .eos_token
+        if self.tokenizer.pad_token is None:
+            if self.tokenizer.eos_token is not None:
+                self.tokenizer.pad_token = self.tokenizer.eos_token
             else:
-                self.tokenizer .add_special_tokens({'pad_token': '[PAD]'})
+                self.tokenizer.add_special_tokens({'pad_token': '[PAD]'})
         try:
             self.model.config.pad_token_id = self.tokenizer.get_vocab()[self.tokenizer.pad_token]
         except:
@@ -225,43 +224,4 @@ class TrainerForSequenceClassification(pl.LightningModule):
         merged_model_path = os.path.join(self.my_params.output_dir, "merged")
         os.makedirs(merged_model_path, exist_ok=True)
         model_to_save.save_pretrained(merged_model_path)
-
-
-
-
-if __name__ == "__main__":
-
-    run_name = "mdberta_duplicate_minority_v2"
-    args_dict = dict(
-        output_dir=f"mdberta/models/{run_name}",
-        model_path="microsoft/mdeberta-v3-base",
-        data_path="/home/kopal/multitude.csv",
-        learning_rate=2e-4,
-        weight_decay=0.01,
-        adam_epsilon=1e-8,
-        warmup_steps=0,
-        train_batch_size=16,
-        eval_batch_size=16,
-        model_save_period_epochs=2,
-        num_train_epochs=10,
-        gradient_accumulation_steps=4,
-        fp_16=False,
-        log=True,
-        demo_dataset=False
-    )
-    args = argparse.Namespace(**args_dict)
-
-    train_params = dict(
-        accumulate_grad_batches=args.gradient_accumulation_steps,
-        max_epochs=args.num_train_epochs,
-        precision= "16-mixed" if args.fp_16 else "32",
-        logger = TensorBoardLogger(save_dir="lightning_logs", name=run_name) if args.log else None,
-        callbacks=[EarlyStopping(monitor="validation_loss", mode="min", patience=10), DeviceStatsMonitor()]
-        # log_every_n_steps = 10 # default is 50
-    )
-
-    model = TrainerForSequenceClassification(args)
-    trainer = pl.Trainer(**train_params)
-    trainer.fit(model)
-
 

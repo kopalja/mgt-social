@@ -1,6 +1,7 @@
 import argparse
 import os
 import torch
+import yaml
 import numpy as np
 import pandas as pd
 import pytorch_lightning as pl
@@ -102,6 +103,9 @@ if __name__ == "__main__":
     print("Training dataset:")
     print(df)
 
+    with open('config.yaml', 'r') as f:
+        config = yaml.safe_load(f)
+
     
     target_map = {
         'microsoft/mdeberta-v3-base': ['query_proj', 'key_proj', 'value_proj'],
@@ -127,22 +131,20 @@ if __name__ == "__main__":
     
     
     train_args = argparse.Namespace(
-        output_dir=f"saved_models/{args.model.split('/')[-1]}",
+        output_dir=f"saved_models_tmp/{args.model.split('/')[-1]}",
         model=model,
         data_path=args.data_path,
         data=df,
         model_name=args.model,
-        learning_rate=2e-4,
-        weight_decay=0.01,
-        adam_epsilon=1e-8,
-        warmup_steps=100,
-        train_batch_size=1 if "aya" in args.model else 2,
-        eval_batch_size=1 if "aya" in args.model else 2,
+        learning_rate=float(config['trainer']['learning_rate']),
+        weight_decay=float(config['trainer']['weight_decay']),
+        adam_epsilon=float(config['trainer']['adam_epsilon']),
+        warmup_steps=float(config['trainer']['warmup_steps']),
+        train_batch_size=config['trainer']['batch_size']['aya'] if "aya" in args.model else config['trainer']['batch_size']['default'],
+        eval_batch_size=config['trainer']['batch_size']['aya'] if "aya" in args.model else config['trainer']['batch_size']['default'],
         model_save_period_epochs=2,
-        num_train_epochs=1,
-        gradient_accumulation_steps=8,
+        num_train_epochs=config['trainer']['epoch'],
         using_peft=args.use_peft,
-        fp_16=False,
         log=True,
         log_to_console=True,
         demo_dataset=args.demo_dataset,
@@ -152,13 +154,12 @@ if __name__ == "__main__":
     
     log_root = "lightning_logs"
     train_params = dict(
-        accumulate_grad_batches=train_args.gradient_accumulation_steps,
+        accumulate_grad_batches=config['trainer']['gradient_accumulation_steps'],
         max_epochs=train_args.num_train_epochs,
-        precision= "16-mixed" if train_args.fp_16 else "32",
+        precision= "16-mixed" if config['trainer']['fp_16'] else "32",
         val_check_interval=0.2,
         deterministic=True,
         logger = TensorBoardLogger(save_dir=os.path.join(log_root, args.job_name), name=args.model.split('/')[-1] if train_args.log else None),
-        # callbacks=[EarlyStopping(monitor="validation_loss", mode="min", patience=10), DeviceStatsMonitor()]
         callbacks=[EarlyStopping(monitor="validation_loss", mode="min", patience=8)]
         # log_every_n_steps = 10 # default is 50
     )
