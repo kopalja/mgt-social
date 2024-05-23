@@ -14,5 +14,5 @@ eval "$(conda shell.bash hook)"
 conda activate mgt-social
 
 
-python eval_model_on_dataframe.py --data_path "/home/kopal/multidomain.csv" --model_path ${MODEL_PATH} 
+python eval_model_on_dataframe.py --data_path "/home/kopal/multidomain.csv" --model_path ${MODEL_PATH} --base_model ${BASE_MODEL}
 

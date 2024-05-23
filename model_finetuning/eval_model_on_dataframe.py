@@ -1,17 +1,14 @@
 import argparse
 import os
-import pathlib
 
 import numpy as np
 import pandas as pd
-import evaluate
 import torch
-from torch.utils.data import DataLoader
-from transformers import AutoTokenizer, AutoModelForSequenceClassification, TrainingArguments, Trainer
-# from custom_datasets import Dataset
-from sklearn.metrics import accuracy_score, roc_curve, auc, f1_score
+from transformers import AutoTokenizer, AutoModelForSequenceClassification
 
 from peft import (
+    PeftModel,
+    prepare_model_for_kbit_training,
     LoraConfig,
     get_peft_model,
 )
@@ -48,6 +45,7 @@ def get_supervised_model_prediction(
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--data_path", type=str, required=True)
+    parser.add_argument('--base_model', type=str, required=True)
     parser.add_argument('--model_path', type=str, required=True)
     parser.add_argument("--batch_size", default=16, type=int)
     args = parser.parse_args()
@@ -63,25 +61,19 @@ if __name__ == "__main__":
     
     
     
-    target_map = {
-        'mdeberta-v3-base': ['query_proj', 'key_proj', 'value_proj'],
-        'xlm-roberta-large': ['query', 'key', 'value'],
-        'falcon-rw-1b': ['query_key_value'],
-        'falcon-11B': ['query_key_value'],
-        'Mistral-7B-v0.1': ['q_proj', 'k_proj', 'v_proj'],
-        'Meta-Llama-3-8B': ['q_proj', 'k_proj', 'v_proj'],
-        'bloomz-3b': ['query_key_value'],
-        'mt5-small': None,
-        'aya-101': None # Default
-    }
-    
+    device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
     
     if 'xlm' in args.model_path:
-        model = AutoModelForSequenceClassification.from_pretrained(os.path.join(args.model_path, "best"), num_labels=2) #, ignore_mismatched_sizes=True)
+        model = AutoModelForSequenceClassification.from_pretrained(os.path.join(args.model_path, "best"), num_labels=2).to(device)
     else:
-        model = AutoModelForSequenceClassification.from_pretrained(os.path.join(args.model_path, "merged"), quantization_config = QUANTIZATION_CONFIG, num_labels=2)
-        # model = get_peft_model(model, LoraConfig(task_type="SEQ_CLS"))
-        model = get_peft_model(model, LoraConfig(task_type="SEQ_CLS", target_modules=target_map[model_name], r=4))
+        # model = AutoModelForSequenceClassification.from_pretrained(os.path.join(args.model_path, "merged"), quantization_config = QUANTIZATION_CONFIG, num_labels=2)
+        # model = get_peft_model(model, LoraConfig(task_type="SEQ_CLS", target_modules=target_map[model_name], r=4))
+        # # model = get_peft_model(model, LoraConfig(task_type="SEQ_CLS"))
+        
+        # base_model_name = "microsoft/mdeberta-v3-base" #path/to/your/model/or/name/on/hub"
+        # adapter_model_name = os.path.join(args.model_path, "best")
+        model = AutoModelForSequenceClassification.from_pretrained(args.base_model, quantization_config = QUANTIZATION_CONFIG, num_labels=2)
+        model = PeftModel.from_pretrained(model, os.path.join(args.model_path, "best"))
     
     try:
         model.config.pad_token_id = tokenizer.get_vocab()[tokenizer.pad_token]
@@ -89,7 +81,6 @@ if __name__ == "__main__":
         print("Warning: Exception occured while setting pad_token_id")
         
 
-    device = torch.device("cuda:0" if torch.cuda.is_available() and 'xlm' not in args.model_path  else "cpu")
     df = pd.read_csv(args.data_path, index_col=0)
 
     df[f"{model_name}_predictions"] = get_supervised_model_prediction(model, tokenizer, df['text'].to_list(), args.batch_size, device)

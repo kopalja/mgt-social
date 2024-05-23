@@ -4,9 +4,9 @@ set -xe
 eval "$(conda shell.bash hook)"
 conda activate mgt-social
 
-declare -a models=("mdeberta-v3-base" "xlm-roberta-large" "falcon-rw-1b" "falcon-11B" "Mistral-7B-v0.1" "Meta-Llama-3-8B" "bloomz-3b" "aya-101")     
+declare -a models=("microsoft/mdeberta-v3-base" "FacebookAI/xlm-roberta-large" "tiiuae/falcon-rw-1b" "tiiuae/falcon-11B" "mistralai/Mistral-7B-v0.1" "meta-llama/Meta-Llama-3-8B" "bigscience/bloomz-3b" "CohereForAI/aya-101")     
 
 for model in "${models[@]}"; do
     model_name=$(basename "$model")
-    sbatch --output="slurm_logs/${model_name}_eval.job" -J "${model_name}"  --export=ALL,MODEL_PATH="saved_models/${model}" job-eval.sh 
+    sbatch --output="slurm_logs/${model_name}_eval.job" -J "${model_name}"  --export=ALL,BASE_MODEL=${model},MODEL_PATH="saved_models/${model_name}" job-eval.sh 
 done
