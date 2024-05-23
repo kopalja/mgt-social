@@ -56,6 +56,7 @@ class MyAdafactorSchedule(AdafactorSchedule):
 class TrainerForSequenceClassification(pl.LightningModule):
     def __init__(self, my_params):
         super(TrainerForSequenceClassification, self).__init__()
+        os.makedirs(self.my_params.output_dir, exist_ok=True)
         self.my_params = my_params
 
         self.model = my_params.model
