@@ -6,7 +6,6 @@
 #SBATCH --nodes=1              # Number of nodes to user
 #SBATCH --gres=gpu:1           # total gpus
 
-# module load cuda/12.0.1
 set -xe
 
 # ACTIVATE ANACONDA
@@ -17,14 +16,11 @@ USE_PEFT="--use_peft"
 if [[ "${MODEL_TYPE}" == "FacebookAI/xlm-roberta-large" ]]; then
     USE_PEFT="--no-use_peft"
 fi
-# if [ "${MODEL_TYPE}" == "FacebookAI/xlm-roberta-large" ] || [ "${MODEL_TYPE}" == "microsoft/mdeberta-v3-base" ]; then
-#     USE_PEFT="--no-use_peft"
-# fi
 
 echo "Running ${MODEL_TYPE}"
-python main.py --data_path "/home/kopal/multidomain.csv" \
+python main.py --data_path ${DATASET} \
                --model ${MODEL_TYPE} \
-               --domain social_media \
+               --domain ${DOMAIN} \
                --job_name ${JOB_NAME} \
                ${USE_PEFT}
 

@@ -9,17 +9,15 @@ import pytorch_lightning as pl
 
 from pytorch_lightning.loggers import TensorBoardLogger
 from pytorch_lightning.callbacks.early_stopping import EarlyStopping
-from transformers import AutoModelForSequenceClassification
+from transformers import AutoModelForSequenceClassification, BitsAndBytesConfig
 from huggingface_hub import login
 
 from peft import (
     prepare_model_for_kbit_training,
     LoraConfig,
     get_peft_model,
-    PeftModel,
 )
 
-from misc import QUANTIZATION_CONFIG
 
 from model_trainer import TrainerForSequenceClassification
 
@@ -50,7 +48,7 @@ if __name__ == "__main__":
         nargs="?",
         required=True,
     )
-    parser.add_argument("--domain", choices=["news", "social_media"], nargs="?")
+    parser.add_argument("--domain", choices=["all", "news", "social_media"], nargs="?")
     parser.add_argument(
         "--language",
         choices=["en", "pt", "de", "nl", "es", "ru", "pl", "ar", "bg", "ca", "uk", "pl", "ro"],
@@ -83,6 +81,8 @@ if __name__ == "__main__":
     parser.add_argument('--job_name', type=str, default="default")
     parser.add_argument('--use_peft', action=argparse.BooleanOptionalAction, default=False)
     parser.add_argument('--demo_dataset', action=argparse.BooleanOptionalAction, default=False)
+    parser.add_argument('--saved_model_root', type=str, default="saved_models")
+    parser.add_argument('--logging_root', type=str, default="lightning_logs")
     args = parser.parse_args()
 
     if args.hf_token:
@@ -96,7 +96,7 @@ if __name__ == "__main__":
         df = df[df['language'].isin(args.language)]
     if args.generator:
         df = df[df['multi_label'].isin(args.generator + ["human"])]
-    if args.domain:
+    if args.domain and args.domain is not "all":
         df = df[df['domain'] == args.domain]
     # df['source'] = [x.replace('multisocial_', '') for x in df['source']] # Dominik
 
@@ -107,60 +107,52 @@ if __name__ == "__main__":
         config = yaml.safe_load(f)
 
     
-    target_map = {
-        'microsoft/mdeberta-v3-base': ['query_proj', 'key_proj', 'value_proj'],
-        'FacebookAI/xlm-roberta-large': ['query', 'key', 'value'],
-        'tiiuae/falcon-rw-1b': ['query_key_value'],
-        'tiiuae/falcon-11B': ['query_key_value'],
-        'mistralai/Mistral-7B-v0.1': ['q_proj', 'k_proj', 'v_proj'],
-        'meta-llama/Meta-Llama-3-8B': ['q_proj', 'k_proj', 'v_proj'],
-        'bigscience/bloomz-3b': ['query_key_value'],
-        'google/mt5-small': None,
-        'CohereForAI/aya-101': None # Default
-    }
-
-
     # 2) Prepare model
     if args.use_peft:
-        model = AutoModelForSequenceClassification.from_pretrained(args.model, quantization_config = QUANTIZATION_CONFIG, num_labels=2, ignore_mismatched_sizes=True)
+        quantization_config = BitsAndBytesConfig(
+            load_in_4bit=config['model']['Quantization']['load_in_4bit'],
+            llm_int8_threshold=config['model']['Quantization']['llm_int8_threshold'],
+            llm_int8_has_fp16_weight=False,
+            bnb_4bit_compute_dtype=torch.float16,
+            bnb_4bit_use_double_quant=True,
+            bnb_4bit_quant_type="nf4")
+        model = AutoModelForSequenceClassification.from_pretrained(args.model_name, quantization_config = quantization_config, num_labels=config['model']['num_labels'], ignore_mismatched_sizes=True)
         model = prepare_model_for_kbit_training(model)
-        model = get_peft_model(model, LoraConfig(task_type="SEQ_CLS", target_modules=target_map[args.model], r=4))
+        model = get_peft_model(model, LoraConfig(task_type="SEQ_CLS", target_modules=config['model']['target_map'].get(args.model_name, None), r=config['model']['Lora']['r']))
     else:
-        model = AutoModelForSequenceClassification.from_pretrained(args.model, num_labels=2, ignore_mismatched_sizes=True)
+        model = AutoModelForSequenceClassification.from_pretrained(args.model_name, num_labels=2, ignore_mismatched_sizes=True)
     print(model)
     
     
     train_args = argparse.Namespace(
-        output_dir=f"saved_models_tmp/{args.model.split('/')[-1]}",
+        output_dir=os.path.join(args.saved_model_root, args.job_name, args.model_name.split('/')[-1]),
         model=model,
         data_path=args.data_path,
         data=df,
-        model_name=args.model,
+        model_name=args.model_name,
         learning_rate=float(config['trainer']['learning_rate']),
         weight_decay=float(config['trainer']['weight_decay']),
         adam_epsilon=float(config['trainer']['adam_epsilon']),
         warmup_steps=float(config['trainer']['warmup_steps']),
-        train_batch_size=config['trainer']['batch_size']['aya'] if "aya" in args.model else config['trainer']['batch_size']['default'],
-        eval_batch_size=config['trainer']['batch_size']['aya'] if "aya" in args.model else config['trainer']['batch_size']['default'],
-        model_save_period_epochs=2,
+        train_batch_size=config['trainer']['batch_size']['aya'] if "aya" in args.model_name else config['trainer']['batch_size']['default'],
+        eval_batch_size=config['trainer']['batch_size']['aya'] if "aya" in args.model_name else config['trainer']['batch_size']['default'],
+        model_save_period_epochs=config['trainer']['model_save_period'],
         num_train_epochs=config['trainer']['epoch'],
         using_peft=args.use_peft,
-        log=True,
-        log_to_console=True,
+        log=config['trainer']['log'],
+        log_to_console=config['trainer']['log_to_console'],
         demo_dataset=args.demo_dataset,
     )
     model_trainer = TrainerForSequenceClassification(train_args)
     
-    
-    log_root = "lightning_logs"
     train_params = dict(
         accumulate_grad_batches=config['trainer']['gradient_accumulation_steps'],
         max_epochs=train_args.num_train_epochs,
         precision= "16-mixed" if config['trainer']['fp_16'] else "32",
         val_check_interval=0.2,
         deterministic=True,
-        logger = TensorBoardLogger(save_dir=os.path.join(log_root, args.job_name), name=args.model.split('/')[-1] if train_args.log else None),
-        callbacks=[EarlyStopping(monitor="validation_loss", mode="min", patience=8)]
+        logger = TensorBoardLogger(save_dir=os.path.join(args.logging_root, args.job_name), name=args.model_name.split('/')[-1] if train_args.log else None),
+        callbacks=[EarlyStopping(monitor="validation_loss", mode="min", patience=config['trainer']['early_stop_patience'])]
         # log_every_n_steps = 10 # default is 50
     )
     pl.Trainer(**train_params).fit(model_trainer)

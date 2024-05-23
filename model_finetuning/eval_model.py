@@ -17,7 +17,7 @@ from peft import (
 )
 
 # from aya_encoder_trainer import AyaEncoderTrainer
-from misc import QUANTIZATION_CONFIG, get_demo_dataset
+from misc import QUANTIZATION_CONFIG
 from custom_datasets import DemoDataset
 
 

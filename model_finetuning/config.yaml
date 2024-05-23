@@ -1,15 +1,48 @@
 
 model:
+  num_labels: 2
+  Lora:
+    r: 4
+  target_map:
+    microsoft/mdeberta-v3-base:
+      - query_proj
+      - key_proj
+      - value_proj
+    FacebookAI/xlm-roberta-large:
+      - query
+      - key
+      - value
+    tiiuae/falcon-rw-1b:
+      - query_key_value
+    tiiuae/falcon-11B:
+      - query_key_value
+    mistralai/Mistral-7B-v0.1:
+      - q_proj
+      - k_proj
+      - v_proj
+    meta-llama/Meta-Llama-3-8B:
+      - q_proj
+      - k_proj
+      - v_proj
+    bigscience/bloomz-3b:
+      - query_key_value
+  Quantization:
+    load_in_4bit: true
+    llm_int8_threshold: 6.0
+
 
 trainer:
   learning_rate: 2e-4
   weight_decay: 0.01
   adam_epsilon: 1e-8
   warmup_steps: 100
+  model_save_period: 2
   epoch: 1
   batch_size:
     aya: 1
     default: 16
   gradient_accumulation_steps: 8
   fp_16: false
-  model_save_period: 2
+  log: true
+  log_to_console: true
+  early_stop_patience: 8
