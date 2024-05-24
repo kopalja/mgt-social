@@ -33,7 +33,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--data_path", type=str, required=True)
     parser.add_argument(
-        "--model",
+        "--model_name",
         choices=[
             "microsoft/mdeberta-v3-base",
             "FacebookAI/xlm-roberta-large",
