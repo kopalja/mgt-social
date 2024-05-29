@@ -40,7 +40,7 @@ trainer:
   epoch: 1
   batch_size:
     aya: 1
-    default: 16
+    default: 2
   gradient_accumulation_steps: 8
   fp_16: false
   log: true

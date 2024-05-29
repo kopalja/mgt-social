@@ -96,7 +96,7 @@ if __name__ == "__main__":
         df = df[df['language'].isin(args.language)]
     if args.generator:
         df = df[df['multi_label'].isin(args.generator + ["human"])]
-    if args.domain and args.domain is not "all":
+    if args.domain and args.domain != "all":
         df = df[df['domain'] == args.domain]
     # df['source'] = [x.replace('multisocial_', '') for x in df['source']] # Dominik
 

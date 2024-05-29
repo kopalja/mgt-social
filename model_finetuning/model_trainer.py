@@ -170,21 +170,21 @@ class TrainerForSequenceClassification(pl.LightningModule):
             
         return DataLoader(val_dataset, batch_size=self.my_params.eval_batch_size, num_workers=4, shuffle=True)
 
-    def on_train_end(self):
-        print("Running model on whole dataset")
-        df = pd.read_csv(self.my_params.data_path, index_col=0)
-        outputs = []
-        device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
-        with torch.no_grad():
-            for index, row in tqdm(df.iterrows(), total=df.shape[0]):
-                inpt = self.tokenizer(row.text, max_length=512, padding="max_length", truncation=True, return_tensors="pt")
-                output = self.model(inpt["input_ids"].to(device), attention_mask=inpt["attention_mask"].to(device))
-                logits = output.logits.detach().cpu()[0]
-                prob = torch.nn.Softmax(dim=0)(logits)[1].numpy()
-                outputs.append(prob)
+    # def on_train_end(self):
+    #     print("Running model on whole dataset")
+    #     df = pd.read_csv(self.my_params.data_path, index_col=0)
+    #     outputs = []
+    #     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+    #     with torch.no_grad():
+    #         for index, row in tqdm(df.iterrows(), total=df.shape[0]):
+    #             inpt = self.tokenizer(row.text, max_length=512, padding="max_length", truncation=True, return_tensors="pt")
+    #             output = self.model(inpt["input_ids"].to(device), attention_mask=inpt["attention_mask"].to(device))
+    #             logits = output.logits.detach().cpu()[0]
+    #             prob = torch.nn.Softmax(dim=0)(logits)[1].numpy()
+    #             outputs.append(prob)
             
-        df[f"{self.my_params.model_name}_predictions"] = outputs
-        df.to_csv(os.path.join(self.my_params.output_dir, f"{self.my_params.model_name.split('/')[-1]}_predictions.csv"))
+    #     df[f"{self.my_params.model_name}_predictions"] = outputs
+    #     df.to_csv(os.path.join(self.my_params.output_dir, f"{self.my_params.model_name.split('/')[-1]}_predictions.csv"))
 
 
     def _update_stats(self, stats: Stats, batch, outputs):
@@ -216,12 +216,12 @@ class TrainerForSequenceClassification(pl.LightningModule):
         self.model.save_pretrained(best_model_path)
         self.tokenizer.save_pretrained(best_model_path)
 
-        if self.my_params.using_peft:
-            base_model = AutoModelForSequenceClassification.from_pretrained(self.my_params.model_name, num_labels=2)
-            model_to_save = PeftModel.from_pretrained(base_model, best_model_path)
-            model_to_save = model_to_save.merge_and_unload()
+        # if self.my_params.using_peft:
+        #     base_model = AutoModelForSequenceClassification.from_pretrained(self.my_params.model_name, num_labels=2)
+        #     model_to_save = PeftModel.from_pretrained(base_model, best_model_path)
+        #     model_to_save = model_to_save.merge_and_unload()
             
-            merged_model_path = os.path.join(self.my_params.output_dir, "merged")
-            os.makedirs(merged_model_path, exist_ok=True)
-            model_to_save.save_pretrained(merged_model_path)
+        #     merged_model_path = os.path.join(self.my_params.output_dir, "merged")
+        #     os.makedirs(merged_model_path, exist_ok=True)
+        #     model_to_save.save_pretrained(merged_model_path)
 
