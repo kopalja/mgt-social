@@ -21,10 +21,18 @@ DOMAIN=${3:-"all"} # {'all', 'news', 'social_media'}
 rm -rf "lightning_logs/${JOB_NAME}"
 mkdir "lightning_logs/${JOB_NAME}"
 
+mkdir -p "saved_models/${JOB_NAME}"
+cp main.py "saved_models/${JOB_NAME}/"
+cp model_trainer.py "saved_models/${JOB_NAME}/"
+cp config.yaml "saved_models/${JOB_NAME}/"
+cp job-finetune.sh "saved_models/${JOB_NAME}/"
+cp batch-job-finetune.sh "saved_models/${JOB_NAME}/"
+cd "saved_models/${JOB_NAME}/"
+
 
 declare -a models=("microsoft/mdeberta-v3-base" "FacebookAI/xlm-roberta-large" "tiiuae/falcon-rw-1b" "tiiuae/falcon-11B" "mistralai/Mistral-7B-v0.1" "meta-llama/Meta-Llama-3-8B" "bigscience/bloomz-3b" "CohereForAI/aya-101")     
 
 for model in "${models[@]}"; do
     model_name=$(basename "$model")
-    sbatch --output="slurm_logs/${model_name}.job" -J "${model_name}"  --export=ALL,MODEL_TYPE=${model},JOB_NAME=${JOB_NAME},DATASET=${DATASET},DOMAIN=${DOMAIN} job-finetune.sh 
+    sbatch --output="slurm_logs/${JOB_NAME}_${model_name}.job" -J "${JOB_NAME}_${model_name}"  --export=ALL,MODEL_TYPE=${model},JOB_NAME=${JOB_NAME},DATASET=${DATASET},DOMAIN=${DOMAIN} job-finetune.sh 
 done

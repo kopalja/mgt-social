@@ -37,7 +37,7 @@ trainer:
   adam_epsilon: 1e-8
   warmup_steps: 100
   model_save_period: 2
-  epoch: 1
+  epoch: 7
   batch_size:
     aya: 1
     default: 2

@@ -1,10 +1,14 @@
 #!/bin/bash
-#SBATCH --account=p365-23-1  # project code
-#SBATCH --partition=gpu  # https://userdocs.nscc.sk/devana/job_submission/partitions/
+#SBATCH --account=p365-23-1
 #SBATCH --mail-user=<jakub.kopal@kinit.sk>
-#SBATCH --mail-type=ALL
-#SBATCH --nodes=1              # Number of nodes to user
-#SBATCH --gres=gpu:1           # total gpus
+##SBATCH --time=hh:mm:ss # Estimate to increase job priority
+
+## Nodes allocation
+#SBATCH --partition=gpu
+#SBATCH --nodes=1 
+#SBATCH --ntasks-per-node=1 
+#SBATCH --cpus-per-task=8
+#SBATCH --gres=gpu:1
 
 set -xe
 

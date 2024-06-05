@@ -94,6 +94,8 @@ class TrainerForSequenceClassification(pl.LightningModule):
         return outputs.loss
 
     def on_train_epoch_end(self):
+        if len(self._training_stats.loss) < 50:
+            return
         loss, auc_value, accuracy, f1 =  self._compute_stats(self._training_stats)
         self._training_stats = Stats()
         self.log_dict({"train_loss": loss, "AUC": auc_value, "ACC": accuracy, "f1": f1, "lr": self.lr_scheduler.get_last_lr()[-1]})

@@ -56,6 +56,11 @@ if __name__ == "__main__":
         nargs="+",
     )
     parser.add_argument(
+        "--source",
+        choices=["telegram", "twitter", "gab", "discord", "whatsapp"],
+        default=None,
+    )
+    parser.add_argument(
         "--generator",
         choices=[
             "gemini",
@@ -92,13 +97,15 @@ if __name__ == "__main__":
     # 1) Create datatset
     df = pd.read_csv(args.data_path, index_col=0)
     df = df[df["split"] == "train"]
+    df['source'] = [x.replace('multisocial_', '') for x in df['source']]
     if args.language:
         df = df[df['language'].isin(args.language)]
     if args.generator:
         df = df[df['multi_label'].isin(args.generator + ["human"])]
     if args.domain and args.domain != "all":
         df = df[df['domain'] == args.domain]
-    # df['source'] = [x.replace('multisocial_', '') for x in df['source']] # Dominik
+    if args.source:
+        df = df[df['source'] == args.source]
 
     print("Training dataset:")
     print(df)
@@ -149,7 +156,7 @@ if __name__ == "__main__":
         accumulate_grad_batches=config['trainer']['gradient_accumulation_steps'],
         max_epochs=train_args.num_train_epochs,
         precision= "16-mixed" if config['trainer']['fp_16'] else "32",
-        val_check_interval=0.2,
+        # val_check_interval=0.2,
         deterministic=True,
         logger = TensorBoardLogger(save_dir=os.path.join(args.logging_root, args.job_name), name=args.model_name.split('/')[-1] if train_args.log else None),
         callbacks=[EarlyStopping(monitor="validation_loss", mode="min", patience=config['trainer']['early_stop_patience'])]
