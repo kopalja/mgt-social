@@ -51,7 +51,7 @@ if __name__ == "__main__":
     parser.add_argument("--domain", choices=["all", "news", "social_media"], nargs="?")
     parser.add_argument(
         "--language",
-        choices=["en", "pt", "de", "nl", "es", "ru", "pl", "ar", "bg", "ca", "uk", "pl", "ro"],
+        choices=["en", "pt", "de", "nl", "es", "ru", "pl", "ar", "bg", "ca", "uk", "ro", "zh", "hr", "cs", "et", "el", "hu", "ga", "gd", "sk", "sl"],
         default=[],
         nargs="+",
     )

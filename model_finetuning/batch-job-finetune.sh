@@ -18,19 +18,20 @@ DATASET=${1:?"Missing path to dataset (.csv)"}
 JOB_NAME=${2:-"default"}
 DOMAIN=${3:-"all"} # {'all', 'news', 'social_media'}
 
-rm -rf "lightning_logs/${JOB_NAME}"
-mkdir "lightning_logs/${JOB_NAME}"
+# rm -rf "lightning_logs/${JOB_NAME}"
+# mkdir "lightning_logs/${JOB_NAME}"
+mkdir -p "lightning_logs/${JOB_NAME}"
 
 mkdir -p "saved_models/${JOB_NAME}"
 cp main.py "saved_models/${JOB_NAME}/"
 cp model_trainer.py "saved_models/${JOB_NAME}/"
+cp custom_datasets.py "saved_models/${JOB_NAME}/"
 cp config.yaml "saved_models/${JOB_NAME}/"
 cp job-finetune.sh "saved_models/${JOB_NAME}/"
 cp batch-job-finetune.sh "saved_models/${JOB_NAME}/"
-cd "saved_models/${JOB_NAME}/"
 
 
-declare -a models=("microsoft/mdeberta-v3-base" "FacebookAI/xlm-roberta-large" "tiiuae/falcon-rw-1b" "tiiuae/falcon-11B" "mistralai/Mistral-7B-v0.1" "meta-llama/Meta-Llama-3-8B" "bigscience/bloomz-3b" "CohereForAI/aya-101")     
+declare -a models=("microsoft/mdeberta-v3-base" "FacebookAI/xlm-roberta-large" "tiiuae/falcon-rw-1b" "tiiuae/falcon-11B" "mistralai/Mistral-7B-v0.1" "meta-llama/Meta-Llama-3-8B" "bigscience/bloomz-3b" "CohereForAI/aya-101")
 
 for model in "${models[@]}"; do
     model_name=$(basename "$model")

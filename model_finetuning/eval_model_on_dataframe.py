@@ -47,7 +47,7 @@ if __name__ == "__main__":
     parser.add_argument("--data_path", type=str, required=True)
     parser.add_argument('--base_model', type=str, required=True)
     parser.add_argument('--model_path', type=str, required=True)
-    parser.add_argument("--batch_size", default=16, type=int)
+    parser.add_argument("--batch_size", default=20, type=int)
     args = parser.parse_args()
 
     model_name = args.model_path.split('/')[-1]
@@ -83,7 +83,23 @@ if __name__ == "__main__":
 
     df = pd.read_csv(args.data_path, index_col=0)
 
-    df[f"{model_name}_predictions"] = get_supervised_model_prediction(model, tokenizer, df['text'].to_list(), args.batch_size, device)
+
+    # A)
+    test_texts = df[df['split'] == 'test']['text'].to_list()
+    test_resutls = get_supervised_model_prediction(model, tokenizer, test_texts, args.batch_size, device)
+    results, index = [], 0
+    for row in df.itertuples():
+        if row.split == 'test':
+            results.append(test_resutls[index])
+            index += 1
+        else:
+            results.append("TODO")
+    df[f"{model_name}_predictions"] = results
+    
+    # B)
+    # df[f"{model_name}_predictions"] = get_supervised_model_prediction(model, tokenizer, test_texts, args.batch_size, device)
+    
+    
     df.to_csv(f"{args.model_path}/{model_name}_predictions_all.csv")
         
         
