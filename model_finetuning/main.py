@@ -27,9 +27,9 @@ np.random.seed(RANDOM_SEED)
 torch.manual_seed(RANDOM_SEED)
 
 
+### Example
+# python main.py --data_path "/home/kopal/multidomain.csv" --model microsoft/mdeberta-v3-base --domain social_media --language en es ru --generator gemini
 if __name__ == "__main__":
-    ### Example
-    # python main.py --data_path "/home/kopal/multidomain.csv" --model microsoft/mdeberta-v3-base --domain social_media --language en es ru --generator gemini
     parser = argparse.ArgumentParser()
     parser.add_argument("--data_path", type=str, required=True)
     parser.add_argument(
@@ -160,7 +160,6 @@ if __name__ == "__main__":
         deterministic=True,
         logger = TensorBoardLogger(save_dir=os.path.join(args.logging_root, args.job_name), name=args.model_name.split('/')[-1] if train_args.log else None),
         callbacks=[EarlyStopping(monitor="validation_loss", mode="min", patience=config['trainer']['early_stop_patience'])]
-        # log_every_n_steps = 10 # default is 50
     )
     pl.Trainer(**train_params).fit(model_trainer)
 
