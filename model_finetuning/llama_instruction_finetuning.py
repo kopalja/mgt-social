@@ -56,7 +56,7 @@ class LlamaInstructionTuning(pl.LightningModule):
         self.my_params = my_params
         model = AutoModelForCausalLM.from_pretrained(my_params.model_path, quantization_config = QUANTIZATION_CONFIG)
         model = prepare_model_for_kbit_training(model)
-        self.model = get_peft_model(model, LoraConfig(task_type="CAUSAL_LM"))
+        self.model = get_peft_model(model, LoraConfig(task_type="CAUSAL_LM", target_modules=["q_proj", "v_proj", "lm_head"],  r=5))
         
         self.tokenizer = AutoTokenizer.from_pretrained(my_params.model_path)
         self.tokenizer.padding_side = 'left'
@@ -95,6 +95,7 @@ class LlamaInstructionTuning(pl.LightningModule):
         self.lr_scheduler.step()
         if (batch_idx % 100 == 0):
             loss, auc_value, accuracy, f1 =  self._compute_stats(self._training_stats)
+            self._training_stats = Stats()
             self.log_dict({"train_loss": loss, "AUC": auc_value, "ACC": accuracy, "f1": f1, "lr": self.lr_scheduler.get_last_lr()[-1]})
         return outputs.loss
 
@@ -157,7 +158,7 @@ class LlamaInstructionTuning(pl.LightningModule):
         if args.demo_dataset:
             train_dataset = DemoDataset(tokenizer=self.tokenizer, size=3000, is_instruction=True)
         else:
-            train_dataset = MultidomaindeDataset(df=self.my_params.data, tokenizer=self.tokenizer, is_instruction=True, train_split=True, balance=BalanceType.CUTMAJORITY)
+            train_dataset = MultidomaindeDataset(df=self.my_params.data, tokenizer=self.tokenizer, is_instruction=True, train_split=True, balance=BalanceType.DUPLICATEMINORITY)
             
         dataloader = DataLoader(train_dataset, batch_size=self.my_params.train_batch_size, drop_last=True, shuffle=True, num_workers=4)
         t_total = self.my_params.num_train_epochs * len(dataloader.dataset) // self.my_params.train_batch_size
@@ -205,7 +206,7 @@ class LlamaInstructionTuning(pl.LightningModule):
 
 if __name__ == "__main__":
 
-    out_root = "saved_models/llama_instruction_4"
+    out_root = "saved_models/llama_instruction_8"
     os.makedirs(out_root, exist_ok=True)
     shutil.copy(__file__, f"{out_root}/llama_instruction_finetuning.py")
     
@@ -224,6 +225,7 @@ if __name__ == "__main__":
     df = df[df['multi_label'].isin(generators + ["human"])]
     df['source'] = [x.replace('multisocial_', '') for x in df['source']]
     df = df.sample(frac=1)
+    df = df[['label', 'text']]
     print("Training data")
     print(df)
 
@@ -238,7 +240,7 @@ if __name__ == "__main__":
         train_batch_size=2,
         eval_batch_size=2,
         model_save_period_epochs=2,
-        num_train_epochs=8,
+        num_train_epochs=2,
         gradient_accumulation_steps=8,
         fp_16=False,
         log=True,
@@ -250,8 +252,8 @@ if __name__ == "__main__":
         accumulate_grad_batches=args.gradient_accumulation_steps,
         max_epochs=args.num_train_epochs,
         precision= 16 if args.fp_16 else 32,
-        val_check_interval=0.5,
-        # gradient_clip_val=1.0,
+        val_check_interval=0.1,
+        gradient_clip_val=0.5,
         logger = TensorBoardLogger(save_dir="lightning_logs", name="llama_instruction") if args.log else None,
     )
 

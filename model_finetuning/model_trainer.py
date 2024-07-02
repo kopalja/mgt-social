@@ -1,24 +1,17 @@
-import argparse
+import time
 import os
 import sys
-from tqdm import tqdm
 
 
-import pandas as pd
-import numpy as np
 import torch
-from torch.utils.data import Dataset, DataLoader
+from torch.utils.data import DataLoader
 import pytorch_lightning as pl
-from pytorch_lightning.loggers import TensorBoardLogger
-from pytorch_lightning.callbacks.early_stopping import EarlyStopping
-from pytorch_lightning.callbacks import DeviceStatsMonitor
 
 from sklearn.metrics import accuracy_score, roc_curve, auc, f1_score
 
 from transformers import (
     AdamW,
     AutoTokenizer,
-    AutoModelForSequenceClassification,
     get_linear_schedule_with_warmup,
 )
 

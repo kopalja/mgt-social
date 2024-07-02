@@ -6,7 +6,7 @@ import numpy as np
 import pandas as pd
 import pytorch_lightning as pl
 
-
+from pytorch_lightning.strategies import DDPStrategy
 from pytorch_lightning.loggers import TensorBoardLogger
 from pytorch_lightning.callbacks.early_stopping import EarlyStopping
 from transformers import AutoModelForSequenceClassification, BitsAndBytesConfig
@@ -21,10 +21,11 @@ from peft import (
 
 from model_trainer import TrainerForSequenceClassification
 
-RANDOM_SEED = 42
-pl.seed_everything(RANDOM_SEED)
-np.random.seed(RANDOM_SEED)
-torch.manual_seed(RANDOM_SEED)
+# ------------------------------------------------------------------------------
+pl.seed_everything(1337)
+torch.cuda.empty_cache()
+torch.set_float32_matmul_precision("high")
+# -----------------------------------------------------------------------------
 
 
 ### Example
@@ -123,7 +124,12 @@ if __name__ == "__main__":
             bnb_4bit_compute_dtype=torch.float16,
             bnb_4bit_use_double_quant=True,
             bnb_4bit_quant_type="nf4")
-        model = AutoModelForSequenceClassification.from_pretrained(args.model_name, quantization_config = quantization_config, num_labels=config['model']['num_labels'], ignore_mismatched_sizes=True)
+        model = AutoModelForSequenceClassification.from_pretrained(
+            args.model_name,
+            quantization_config = quantization_config,
+            num_labels=config['model']['num_labels'],
+            ignore_mismatched_sizes=True,
+            device_map=int(os.environ["SLURM_PROCID"]))
         model = prepare_model_for_kbit_training(model)
         model = get_peft_model(model, LoraConfig(task_type="SEQ_CLS", target_modules=config['model']['target_map'].get(args.model_name, None), r=config['model']['Lora']['r']))
     else:
@@ -152,6 +158,7 @@ if __name__ == "__main__":
     )
     model_trainer = TrainerForSequenceClassification(train_args)
     
+    gpus = torch.cuda.device_count()
     train_params = dict(
         accumulate_grad_batches=config['trainer']['gradient_accumulation_steps'],
         max_epochs=train_args.num_train_epochs,
@@ -159,7 +166,9 @@ if __name__ == "__main__":
         # val_check_interval=0.2,
         deterministic=True,
         logger = TensorBoardLogger(save_dir=os.path.join(args.logging_root, args.job_name), name=args.model_name.split('/')[-1] if train_args.log else None),
-        callbacks=[EarlyStopping(monitor="validation_loss", mode="min", patience=config['trainer']['early_stop_patience'])]
+        callbacks=[EarlyStopping(monitor="validation_loss", mode="min", patience=config['trainer']['early_stop_patience'])],
+        devices=gpus,
+        strategy=DDPStrategy(find_unused_parameters=True) if gpus > 1 else "auto"
     )
     pl.Trainer(**train_params).fit(model_trainer)
 

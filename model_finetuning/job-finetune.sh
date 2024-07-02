@@ -6,7 +6,7 @@
 ## Nodes allocation
 #SBATCH --partition=gpu
 #SBATCH --nodes=1 
-#SBATCH --ntasks-per-node=1 
+#SBATCH --ntasks-per-node=1
 #SBATCH --cpus-per-task=8
 #SBATCH --gres=gpu:1
 
@@ -22,9 +22,9 @@ if [[ "${MODEL_TYPE}" == "FacebookAI/xlm-roberta-large" ]]; then
 fi
 
 echo "Running ${MODEL_TYPE}"
-python main.py --data_path ${DATASET} \
-               --model ${MODEL_TYPE} \
-               --domain ${DOMAIN} \
-               --job_name ${JOB_NAME} \
-               ${USE_PEFT}
+srun python main.py --data_path ${DATASET} \
+                    --model ${MODEL_TYPE} \
+                    --domain ${DOMAIN} \
+                    --job_name ${JOB_NAME} \
+                    ${USE_PEFT}
 
