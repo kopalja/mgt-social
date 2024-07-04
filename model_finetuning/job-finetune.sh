@@ -6,9 +6,9 @@
 ## Nodes allocation
 #SBATCH --partition=gpu
 #SBATCH --nodes=1 
-#SBATCH --ntasks-per-node=2
-#SBATCH --cpus-per-task=8
-#SBATCH --gres=gpu:2
+#SBATCH --ntasks-per-node=1
+#SBATCH --cpus-per-task=16
+#SBATCH --gres=gpu:1
 
 set -xe
 
@@ -23,11 +23,9 @@ if [[ "${MODEL_TYPE}" == "FacebookAI/xlm-roberta-large" ]]; then
     USE_PEFT="--no-use_peft"
 fi
 
-USE_PEFT="--no-use_peft" # TODO: remove
 
 echo "Running ${MODEL_TYPE}"
-# accelerate launch main.py --data_path ${DATASET} \
-srun python main.py --data_path ${DATASET} \
+python main.py --data_path ${DATASET} \
                     --model ${MODEL_TYPE} \
                     --domain ${DOMAIN} \
                     --job_name ${JOB_NAME} \

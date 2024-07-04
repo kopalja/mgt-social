@@ -167,8 +167,6 @@ if __name__ == "__main__":
         deterministic=True,
         logger = TensorBoardLogger(save_dir=os.path.join(args.logging_root, args.job_name), name=args.model_name.split('/')[-1] if train_args.log else None),
         callbacks=[EarlyStopping(monitor="validation_loss", mode="min", patience=config['trainer']['early_stop_patience'])],
-        devices=gpus,
-        strategy="deepspeed_stage_2" if gpus > 1 else "auto",
     )
     pl.Trainer(**train_params).fit(model_trainer)
 
