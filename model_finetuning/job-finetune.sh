@@ -26,8 +26,8 @@ fi
 
 echo "Running ${MODEL_TYPE}"
 python main.py --data_path ${DATASET} \
-                    --model ${MODEL_TYPE} \
-                    --domain ${DOMAIN} \
-                    --job_name ${JOB_NAME} \
-                    ${USE_PEFT}
+               --model ${MODEL_TYPE} \
+               --domain ${DOMAIN} \
+               --job_name ${JOB_NAME} \
+               ${USE_PEFT}
 
