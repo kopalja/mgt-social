@@ -68,6 +68,7 @@ class TrainerForSequenceClassification(pl.LightningModule):
         self._best_validation_loss = sys.float_info.max
         self._training_stats, self._validation_stats = Stats(), Stats()
         self._first_validation_finished = False
+        self.start_time = time.time()
 
     def forward(self, batch):
         return self.model(
@@ -127,6 +128,8 @@ class TrainerForSequenceClassification(pl.LightningModule):
             self._best_validation_loss = loss
 
     def configure_optimizers(self):
+        if hasattr(self, 'opt'):
+            return self.opt
         if self.my_params.using_peft:
             no_decay = ["bias", "LayerNorm.weight"]
             optimizer_grouped_parameters = [
@@ -154,6 +157,8 @@ class TrainerForSequenceClassification(pl.LightningModule):
         dataloader = DataLoader(train_dataset, batch_size=self.my_params.train_batch_size, drop_last=True, shuffle=True, num_workers=4)
         if self.my_params.using_peft:
             t_total = self.my_params.num_train_epochs * len(dataloader.dataset) // self.my_params.train_batch_size
+            if not hasattr(self, 'opt'):
+                self.configure_optimizers()
             self.lr_scheduler = get_linear_schedule_with_warmup(self.opt, num_warmup_steps=self.my_params.warmup_steps, num_training_steps=t_total)
         return dataloader
 

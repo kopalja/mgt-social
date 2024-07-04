@@ -14,7 +14,7 @@ class DataLoaderLite:
         enc = tiktoken.get_encoding('gpt2')
         tokens = enc.encode(text)
         self.tokens = torch.tensor(tokens)
-        self.tokens = self.tokens.repeat(10) # Make dataset artiffically bigger
+        self.tokens = self.tokens.repeat(100) # Make dataset artiffically bigger
         print(f"loaded {len(self.tokens)} tokens")
 
     def __getitem__(self, index):

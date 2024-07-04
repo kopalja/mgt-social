@@ -1,3 +1,4 @@
+import os
 import time
 from dataclasses import dataclass
 
@@ -33,27 +34,38 @@ class GPTTranner(pl.LightningModule):
         super(GPTTranner, self).__init__()
         self.model = model
         self.config = config
+        self.start_time = time.time()
 
-    def forward(self, batch):
-        return self.model.forward(batch[0], batch[1])
 
     def training_step(self, batch, batch_idx):
-        t0 = time.time()
-        logits, loss = self.forward(batch)
+        logits, loss = self.model.forward(batch[0], batch[1])
         self.lr_scheduler.step()
-        torch.cuda.synchronize()  # wait for the GPU to finish work
-        t1 = time.time()
-        dt = t1 - t0  # time difference in seconds
+        for device_id in range(self.config.n_gpu):
+            torch.cuda.synchronize(device_id)  # wait for the GPUs to finish work
+
+        now = time.time()
+        dt = now - self.start_time  # time difference in seconds
+        self.start_time = now
         tokens_processed = self.config.B * self.config.T
         tokens_per_sec = tokens_processed / dt
         lr = self.lr_scheduler.get_last_lr()[-1]
+
+        gpu_info = ""
+        for gpu_index in range(self.config.n_gpu):
+            max_vram = torch.cuda.memory_reserved(gpu_index) / (1024 * 1024 * 1024)
+            utilization = torch.cuda.utilization(gpu_index)
+            gpu_info += f" | vram{gpu_index} {max_vram:.2f}GB | util{gpu_index} {utilization:.2f}%"
         print(
-            f"step {batch_idx:4d} | lr: {lr:.4f} | loss: {loss.item():.6f} | dt: {dt*1000:.2f}ms | tok/sec: {tokens_per_sec:.2f}"
+            f"process: {os.environ['SLURM_PROCID']} | step {batch_idx:4d} | lr: {lr:.4f} | loss: {loss.item():.6f} | dt: {dt*1000:.2f}ms | tok/sec: {tokens_per_sec:.2f}{gpu_info}", flush=True
         )
+        if batch_idx % 10 == 0:
+            print(os.system('nvidia-smi'))
         self.log_dict({"train_loss": loss.item(), "lr": self.lr_scheduler.get_last_lr()[-1]})
         return loss
 
     def configure_optimizers(self):
+        if hasattr(self, 'opt'):
+            return self.opt
         # start with all of the candidate parameters (that require grad)
         param_dict = {pn: p for pn, p in self.named_parameters()}
         param_dict = {pn: p for pn, p in param_dict.items() if p.requires_grad}
@@ -76,6 +88,8 @@ class GPTTranner(pl.LightningModule):
     def train_dataloader(self):
         train_dataset = DataLoaderLite(T=self.config.T)
         steps = self.config.epochs * len(train_dataset) // self.config.B // self.config.n_gpu
+        if not hasattr(self, 'opt'):
+            self.configure_optimizers()
         self.lr_scheduler = torch.optim.lr_scheduler.CosineAnnealingWarmRestarts(self.opt, T_0=steps)
         return DataLoader(train_dataset, batch_size=self.config.B, num_workers=15)
 
@@ -98,8 +112,9 @@ def main():
         log_every_n_steps=1,
         logger=TensorBoardLogger(save_dir="lightning_logs", name="demo"),
         devices=trainer_config.n_gpu,
-        strategy="ddp" if trainer_config.n_gpu > 1 else "auto",
+        strategy='deepspeed_stage_2' if trainer_config.n_gpu > 1 else 'auto',
     )
+    # trainer.strategy.config["zero_force_ds_cpu_optimizer"] = False
     trainer.fit(gpt_trainer)
 
 

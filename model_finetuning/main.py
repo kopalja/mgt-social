@@ -6,7 +6,6 @@ import numpy as np
 import pandas as pd
 import pytorch_lightning as pl
 
-from pytorch_lightning.strategies import DDPStrategy
 from pytorch_lightning.loggers import TensorBoardLogger
 from pytorch_lightning.callbacks.early_stopping import EarlyStopping
 from transformers import AutoModelForSequenceClassification, BitsAndBytesConfig
@@ -129,11 +128,12 @@ if __name__ == "__main__":
             quantization_config = quantization_config,
             num_labels=config['model']['num_labels'],
             ignore_mismatched_sizes=True,
-            device_map=int(os.environ["SLURM_PROCID"]))
+        )
+            # device_map=int(os.environ["SLURM_PROCID"]))
         model = prepare_model_for_kbit_training(model)
         model = get_peft_model(model, LoraConfig(task_type="SEQ_CLS", target_modules=config['model']['target_map'].get(args.model_name, None), r=config['model']['Lora']['r']))
     else:
-        model = AutoModelForSequenceClassification.from_pretrained(args.model_name, num_labels=2, ignore_mismatched_sizes=True)
+        model = AutoModelForSequenceClassification.from_pretrained(args.model_name, num_labels=2, ignore_mismatched_sizes=True, device_map=int(os.environ["SLURM_PROCID"]))
     print(model)
     
     
@@ -168,7 +168,7 @@ if __name__ == "__main__":
         logger = TensorBoardLogger(save_dir=os.path.join(args.logging_root, args.job_name), name=args.model_name.split('/')[-1] if train_args.log else None),
         callbacks=[EarlyStopping(monitor="validation_loss", mode="min", patience=config['trainer']['early_stop_patience'])],
         devices=gpus,
-        strategy=DDPStrategy(find_unused_parameters=True) if gpus > 1 else "auto"
+        strategy="deepspeed_stage_2" if gpus > 1 else "auto",
     )
     pl.Trainer(**train_params).fit(model_trainer)
 
