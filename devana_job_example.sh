@@ -6,7 +6,6 @@
 #SBATCH --mail-type=ALL
 #SBATCH --nodes=1              # Number of nodes to user
 #SBATCH --gres=gpu:1           # total gpus
-#SBATCH --output=job.log
 
 # module load cuda/12.0.1
 
@@ -44,5 +43,7 @@ conda activate mgt-social
 # Finetuning
 # python -m aya_finetuning.finetuning --model_name google/mt5-small --demo_dataset
 # python -m aya_finetuning.instruction_finetuning
-python -m mdberta.finetuning
+# python -m mdberta.finetuning
+python analyze_dataset.py
+
 
