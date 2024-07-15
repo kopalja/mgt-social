@@ -44,6 +44,7 @@ if __name__ == "__main__":
             "bigscience/bloomz-3b",
             "google/mt5-small",
             "CohereForAI/aya-101",
+            "EleutherAI/gpt-neox-20b"
         ],
         nargs="?",
         required=True,
@@ -93,6 +94,8 @@ if __name__ == "__main__":
     if args.hf_token:
         login(token=args.hf_token)
 
+    gpus = torch.cuda.device_count()
+    print(f"Available {gpus} gpus")
 
     # 1) Create datatset
     df = pd.read_csv(args.data_path, index_col=0)
@@ -128,6 +131,7 @@ if __name__ == "__main__":
             quantization_config = quantization_config,
             num_labels=config['model']['num_labels'],
             ignore_mismatched_sizes=True,
+            device_map = os.environ.get('SLURM_PROCID', 'auto')
         )
             # device_map=int(os.environ["SLURM_PROCID"]))
         model = prepare_model_for_kbit_training(model)
@@ -158,7 +162,6 @@ if __name__ == "__main__":
     )
     model_trainer = TrainerForSequenceClassification(train_args)
     
-    gpus = torch.cuda.device_count()
     train_params = dict(
         accumulate_grad_batches=config['trainer']['gradient_accumulation_steps'],
         max_epochs=train_args.num_train_epochs,
@@ -167,6 +170,8 @@ if __name__ == "__main__":
         deterministic=True,
         logger = TensorBoardLogger(save_dir=os.path.join(args.logging_root, args.job_name), name=args.model_name.split('/')[-1] if train_args.log else None),
         callbacks=[EarlyStopping(monitor="validation_loss", mode="min", patience=config['trainer']['early_stop_patience'])],
+        devices=gpus,
+        strategy='ddp_find_unused_parameters_true' if gpus > 1 else 'auto'
     )
     pl.Trainer(**train_params).fit(model_trainer)
 

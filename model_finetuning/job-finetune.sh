@@ -25,6 +25,7 @@ fi
 
 
 echo "Running ${MODEL_TYPE}"
+# srun python main.py --data_path ${DATASET} \
 python main.py --data_path ${DATASET} \
                --model ${MODEL_TYPE} \
                --domain ${DOMAIN} \

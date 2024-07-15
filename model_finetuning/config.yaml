@@ -26,6 +26,8 @@ model:
       - v_proj
     bigscience/bloomz-3b:
       - query_key_value
+    EleutherAI/gpt-neox-20b:
+      - query_key_value
   Quantization:
     load_in_4bit: true
     llm_int8_threshold: 6.0
