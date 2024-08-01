@@ -8,13 +8,14 @@ class DataLoaderLite:
     
     def __init__(self, T):
         self.T = T
-        with open('input.txt', 'r') as f:
+        with open('gutenberg_books.txt', 'r') as f:
+        # with open('tiny_shakespear.txt', 'r') as f:
             text = f.read()
 
         enc = tiktoken.get_encoding('gpt2')
         tokens = enc.encode(text)
         self.tokens = torch.tensor(tokens)
-        self.tokens = self.tokens.repeat(100) # Make dataset artiffically bigger
+        # self.tokens = self.tokens.repeat(100) # Make dataset artiffically bigger
         print(f"loaded {len(self.tokens)} tokens")
 
     def __getitem__(self, index):

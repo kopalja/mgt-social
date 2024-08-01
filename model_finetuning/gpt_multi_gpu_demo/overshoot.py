@@ -3,10 +3,12 @@ import time
 from dataclasses import dataclass
 
 import pytorch_lightning as pl
+import pandas as pd
 import torch
 from pytorch_lightning.loggers import TensorBoardLogger
 from torch.utils.data import DataLoader
 import copy
+import os
 
 from datasets import DataLoaderLite
 from gpt import GPT, GPTConfig
@@ -17,14 +19,16 @@ torch.cuda.empty_cache()
 torch.set_float32_matmul_precision("high")
 # -----------------------------------------------------------------------------
 
+JOB_NAME = os.environ['JOB_NAME']
+OVERSHOOT_FACTOR = float(os.environ['OVERSHOOT_FACTOR'])
 
 @dataclass
 class TrainerConfig:
     n_gpu: int = torch.cuda.device_count() # Use all available gpus
     B: int = 16
-    T: int = 256 # 1024
+    T: int = 1024
     lr_base = 3e-4
-    lr_overshoot = 3e-3
+    lr_overshoot = OVERSHOOT_FACTOR * 3e-4
     epochs: int = 4
     weight_decay: float = 0.1
     accumulate_grad_batches: int = 2
@@ -40,6 +44,7 @@ class GPTTranner(pl.LightningModule):
         self.config = config
         self.start_time = time.time()
         self.optimizers_configured = False
+        self.training_stats = {key: [] for key in ["step", "base_lr", "overshoot_lr", "base_loss", "overshoot_loss"]}
 
 
     def training_step(self, batch, batch_idx):
@@ -47,11 +52,10 @@ class GPTTranner(pl.LightningModule):
             opt.zero_grad()
         
         logits, loss = self.overshoot_model.forward(batch[0], batch[1])
-        if batch_idx % 10 == 0:
-            with torch.no_grad():
-                _, loss_base = self.base_model.forward(batch[0], batch[1])
         
-        
+        # Only for statistic purposes
+        with torch.no_grad():
+            _, loss_base = self.base_model.forward(batch[0], batch[1])
         self.manual_backward(loss)
         
         # Gradients OVERSHOOT -> BASE
@@ -90,13 +94,19 @@ class GPTTranner(pl.LightningModule):
             print(
                 f"process: {os.environ.get('SLURM_PROCID', 0)} | step {batch_idx:4d} | lr_base: {lr_base:.4f} | lr_overshoot: {lr_overshoot:.4f} | loss_base: {loss_base.item():.6f} | loss_overshoot: {loss.item():.6f}  | dt: {dt*1000:.2f}ms | tok/sec: {tokens_per_sec:.2f}{gpu_info}", flush=True
             )
-        self.log_dict({"train_loss": loss.item(), "lr_base": self.base_scheduler.get_last_lr()[-1], "lr_overshoot": self.overshoot_scheduler.get_last_lr()[-1]})
+            
+        self.training_stats["step"].append(batch_idx + (self.current_epoch * len(self._train_dataset) // self.config.B))
+        self.training_stats["base_lr"].append(lr_base)
+        self.training_stats["overshoot_lr"].append(lr_overshoot)
+        self.training_stats["base_loss"].append(loss_base.item())
+        self.training_stats["overshoot_loss"].append(loss.item())
+        self.log_dict({"base_lr": lr_base, "overshoot_lr": lr_overshoot, "base_loss": loss_base.item(), "overshoot_loss": loss.item()})
         return loss
 
     def configure_optimizers(self):
-        if not hasattr(self, 'steps'):
-            train_dataset = DataLoaderLite(T=self.config.T)
-            self.steps = self.config.epochs * len(train_dataset) // self.config.B // self.config.n_gpu
+        if not hasattr(self, '_train_dataset'):
+            self._train_dataset = DataLoaderLite(T=self.config.T)
+            self.steps = int(round(self.config.B + self.config.epochs * len(self._train_dataset) // self.config.B // self.config.n_gpu))
 
         for model_name in ['base', 'overshoot']:
             # start with all of the candidate parameters (that require grad)
@@ -124,9 +134,11 @@ class GPTTranner(pl.LightningModule):
         return [self.base_opt, self.overshoot_opt]
 
     def train_dataloader(self):
-        train_dataset = DataLoaderLite(T=self.config.T)
-        self.steps = self.config.epochs * len(train_dataset) // self.config.B // self.config.n_gpu
-        return DataLoader(train_dataset, batch_size=self.config.B, num_workers=15)
+        if not hasattr(self, '_train_dataset'):
+            self._train_dataset = DataLoaderLite(T=self.config.T)
+            self.steps = int(round(self.config.B + self.config.epochs * len(self._train_dataset) // self.config.B // self.config.n_gpu))
+        print("Total Steps: ", self.steps)
+        return DataLoader(self._train_dataset, batch_size=self.config.B, num_workers=15)
 
 
 # -----------------------------------------------------------------------------
@@ -145,17 +157,15 @@ def main():
         precision="16-mixed",
         enable_progress_bar=False,
         log_every_n_steps=1,
-        logger=TensorBoardLogger(save_dir="lightning_logs", name="demo"),
+        logger=TensorBoardLogger(save_dir=os.path.join("lightning_logs", JOB_NAME), name=f"overshoot_factor{OVERSHOOT_FACTOR:.2f}"),
         devices=trainer_config.n_gpu,
         strategy='deepspeed_stage_2' if trainer_config.n_gpu > 1 else 'auto',
     )
     # trainer.strategy.config["zero_force_ds_cpu_optimizer"] = False
     trainer.fit(gpt_trainer)
+    pd.DataFrame(gpt_trainer.training_stats).to_csv(os.path.join("lightning_logs", JOB_NAME, f"overshoot_factor_{OVERSHOOT_FACTOR:.2f}.csv"), index=False)
 
 
 if __name__ == "__main__":
     main()
 
-
-
-# [[p.grad for p in g['params']] for g in opt.param_groups]
